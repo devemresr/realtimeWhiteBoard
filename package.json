@@ -1,38 +1,40 @@
 {
-	"name": "finalproject",
-	"version": "1.0.0",
-	"description": "",
-	"type": "module",
-	"main": "index.js",
-	"scripts": {
-		"test": "echo \"Error: no test specified\" && exit 1",
-		"back": "npx nodemon --exec tsx server/index.ts",
-		"dev": "cd client && next dev",
-		"build": "cd client && next build",
-		"start": "cd client && next start",
-		"lint": "cd client && next lint"
-	},
-	"author": "",
-	"license": "ISC",
-	"dependencies": {
-		"cookie-parser": "^1.4.7",
-		"cors": "^2.8.5",
-		"dotenv": "^17.0.0",
-		"express": "^5.1.0",
-		"next": "^15.3.4",
-		"socket.io": "^4.8.1",
-		"socket.io-client": "^4.8.1"
-	},
-	"devDependencies": {
-		"@types/cookie-parser": "^1.4.9",
-		"@types/cors": "^2.8.19",
-		"@types/node": "^24.0.8",
-		"@types/react": "^19.1.8",
-		"autoprefixer": "^10.4.21",
-		"nodemon": "^3.1.10",
-		"postcss": "^8.5.6",
-		"tailwindcss": "^3.4.17",
-		"ts-node": "^10.9.2",
-		"tsx": "^4.20.3"
-	}
+  "name": "finalproject",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "back": "npx nodemon --exec tsx server/index.ts",
+    "dev": "cd client && next dev -p 3001",
+    "build": "cd client && next build",
+    "start": "cd client && next start",
+    "lint": "cd client && next lint"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@socket.io/admin-ui": "^0.5.1",
+    "artillery": "^2.0.23",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "next": "^15.3.4",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/node": "^24.0.8",
+    "@types/react": "^19.1.8",
+    "autoprefixer": "^10.4.21",
+    "nodemon": "^3.1.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.3"
+  }
 }

@@ -1,0 +1,17 @@
+config:
+  target: 'http://localhost:3000'
+  phases:
+    - duration: 30 # Run for 30 seconds
+      arrivalRate: 5 # 5 new connections per second
+
+scenarios:
+  - name: 'Basic Socket.IO test'
+    engine: socketio
+    flow:
+      - emit:
+          channel: 'message' # Event name to emit
+          data: 'Hello from Artillery!'
+      - think: 1 # Wait 1 second
+      - emit:
+          channel: 'ping'
+          data: { timestamp: '{{ $timestamp }}' }
