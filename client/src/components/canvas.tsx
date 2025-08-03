@@ -1,5 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, Ref } from 'react';
 import { Socket } from 'socket.io-client';
+import DrawingAnalytics from '../util/DrawingAnalytics';
+
 interface ChildComponentProps {
 	socket: Socket | null;
 }
@@ -16,11 +18,12 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const [brushSize, setBrushSize] = useState(5);
 	const [brushColor, setBrushColor] = useState('#000000');
 	const [strokePoints, setStrokePoints] = useState([]); // stores all the data from what mouse event tracked gets cleared everytime mouseDown gets triggered
-	const pointsBuffer = useRef([]);
+	const pointsBuffer = useRef<Point[]>([]);
 	const retryBuffer = useRef([]);
 	const incompletePacketTimeout = useRef(null);
 	const packageNumber = useRef<number>(1);
 	const strokeNumber = useRef<number>(1);
+	const strokeId = useRef<string>('');
 	const lastBroadcastPoint = useRef<Point>(null);
 	const POINTS_PER_PACKET = 5;
 	const MAXGAP = 5;
@@ -37,8 +40,14 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		ctx.lineWidth = brushSize;
 	}, [brushColor, brushSize]);
 
+	const analytics: any = useRef(null);
 	useEffect(() => {
 		if (!socket) return;
+		console.log('render');
+
+		analytics.current = new DrawingAnalytics('user123', 6000);
+		analytics.current.startRealtimeMonitoring(2000);
+		console.log('analytics', analytics, 'tpye', typeof analytics);
 
 		const handleDrawingPacket = (data: any) => {
 			const isLastPackage = data?.isLastPacket;
@@ -142,12 +151,12 @@ export default function Canvas({ socket }: ChildComponentProps) {
 
 			// Smart interpolation to fill gaps
 			const interpolatedPoints = smartInterpolation(points, MAXGAP); // This array's length varies with velocity and its the final array for the canvas to draw
-			console.log(
-				'points in drawPathOnCanvas',
-				points,
-				'interpolatedPoints, ',
-				interpolatedPoints
-			);
+			// console.log(
+			// 	'points in drawPathOnCanvas',
+			// 	points,
+			// 	'interpolatedPoints, ',
+			// 	interpolatedPoints
+			// );
 
 			ctx.beginPath();
 			ctx.moveTo(interpolatedPoints[0].x, interpolatedPoints[0].y);
@@ -177,14 +186,14 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				// First packet: draw immediately
 				drawPoints = points;
 				lastBroadcastPoint.current = points[points.length - 1];
-				console.log('first packet');
+				// console.log('first packet');
 			} else if (standalonePackage) {
-				console.log('standalone');
+				// console.log('standalone');
 				drawPoints = points;
 				lastBroadcastPoint.current = null;
 			} else if (isLastPacket) {
 				// Last packet: ensure seamless connection
-				console.log('last packet');
+				// console.log('last packet');
 				if (lastBroadcastPoint.current) {
 					// Check if first point of current packet matches last broadcast point
 					const firstPoint = points[0];
@@ -253,15 +262,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 			// Send complete packets immediately
 			for (let i = 0; i < packageThreshold; i++) {
 				const strokes = pointsBuffer.current.splice(0, POINTS_PER_PACKET);
-				const packageSequenceNumber = packageNumber.current++;
-				const strokeData = {
-					strokes,
-					strokeId: strokeId.current,
-					packageSequenceNumber,
-				};
-
-				retryBuffer.current.push(strokeData);
-				socket.emit('drawing-packet', strokeData);
+				sendPackage(strokes);
 			}
 		} else {
 			// Set timeout for remaining incomplete packet (if any)
@@ -276,20 +277,28 @@ export default function Canvas({ socket }: ChildComponentProps) {
 						0,
 						pointsBuffer.current.length
 					);
-					const packageSequenceNumber = packageNumber.current++;
-
-					const strokeData = {
-						strokes,
-						strokeId: strokeId.current,
-						packageSequenceNumber,
-					};
-
-					retryBuffer.current.push(strokeData);
-					socket.emit('drawing-packet', strokeData);
+					sendPackage(strokes);
 				}, INCOMPLETE_PACKAGE_TIMEOUT);
 			}
 		}
 	}, [socket]);
+
+	const sendPackage = useCallback(
+		(strokes, isLastPackage?: boolean, strokeSequenceNumber?: number) => {
+			const packageSequenceNumber = packageNumber.current++;
+			const strokeData = {
+				strokes,
+				strokeId: strokeId.current,
+				packageSequenceNumber,
+				...(isLastPackage && { isLastPackage: true }),
+				...(strokeSequenceNumber !== undefined && { strokeSequenceNumber }),
+			};
+
+			retryBuffer.current.push(strokeData);
+			analytics.current.emitWithLogging(socket, 'drawing-packet', strokeData);
+		},
+		[handlePackageSending]
+	);
 
 	const draw = useCallback(
 		(e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -337,30 +346,14 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				pointsBuffer.current.length
 			);
 			const strokeSequenceNumber = strokeNumber.current++;
-			const packageSequenceNumber = packageNumber.current;
-
-			const strokeData = {
-				strokes,
-				strokeId: strokeId.current,
-				packageSequenceNumber,
-				isLastPacket: true,
-				strokeSequenceNumber,
-			};
-			retryBuffer.current.push(strokeData);
-			socket.emit('drawing-packet', strokeData);
+			const isLastPackage = true;
+			sendPackage(strokes, isLastPackage, strokeSequenceNumber);
 		} else {
 			// If no remaining points, send a stroke end signal
 			const strokeSequenceNumber = strokeNumber.current++;
-
-			const strokeEndData = {
-				strokeId: strokeId.current,
-				isLastPacket: true,
-				packageSequenceNumber: packageNumber.current,
-				strokeSequenceNumber,
-				strokes: [],
-			};
-
-			socket.emit('drawing-packet', strokeEndData);
+			const strokes = [];
+			const isLastPackage = true;
+			sendPackage(strokes, isLastPackage, strokeSequenceNumber);
 		}
 
 		setIsDrawing(false);
@@ -379,7 +372,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const generateStrokeId = (): string => {
 		return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 	};
-	const strokeId = useRef('');
 
 	// Clean up animation frame on unmount
 	useEffect(() => {

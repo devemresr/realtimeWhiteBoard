@@ -2,6 +2,7 @@ node_modules
 server/.env
 client/.env
 todo.txt
+devblog.txt
 
 # Playwright
 /test-results/

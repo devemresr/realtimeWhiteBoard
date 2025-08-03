@@ -1,4 +1,9 @@
-import test, { type Page, type Locator, expect } from '@playwright/test';
+import test, {
+	type Page,
+	type Locator,
+	expect,
+	chromium,
+} from '@playwright/test';
 import { DrawingPatternMocker } from './utility/DrawingPatternMocker';
 
 // Usage function with proper typing
@@ -19,13 +24,28 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('random drawings', async ({ page, browser }) => {
-	const context = await browser.newContext();
-
 	for (let i = 0; i < 3; i++) {
-		const newPage = await context.newPage();
-		await newPage.goto('http://localhost:3001/');
-		await newPage.waitForLoadState('networkidle');
-		expect(page.getByText('Connected with socket ID'));
-		await mockDrawingSession(newPage);
+		for (let a = 0; a < 4; a++) {
+			const windowPositionsY = i * 300;
+			const windowPositionsX = a * 300;
+			const windowPosition = `${windowPositionsX},${windowPositionsY}`;
+			const browser2 = await chromium.launch({
+				headless: false,
+				args: [`--window-position=${windowPosition}`, '--window-size=300,300'],
+			});
+			const context = await browser2.newContext({
+				viewport: { width: 400, height: 300 },
+			});
+			const page = await context.newPage();
+			await page.goto('http://localhost:3001/');
+			await page.evaluate(() => {
+				window.scrollBy(0, 160);
+			});
+			if (i == 2 && a === 3) {
+				await page.waitForTimeout(10000000); // Wait 10 seconds
+			}
+		}
+
+		// await context.close();
 	}
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, use } from 'react';
 import { io } from 'socket.io-client';
 import Canvas from '../components/canvas';
 import { Socket } from 'socket.io-client';
@@ -25,6 +25,15 @@ const whiteBoardApp = () => {
 			setConnected(true);
 			setSocketId(newSocket.id);
 		});
+		// todo change stuff based on ping
+		setInterval(() => {
+			const start = Date.now();
+
+			newSocket.emit('ping', () => {
+				const duration = Date.now() - start;
+				// console.log(duration);
+			});
+		}, 1000);
 
 		newSocket.on('disconnect', () => {
 			console.log('Disconnected from server');

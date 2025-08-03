@@ -37,19 +37,12 @@ export default class StrokePackageGapDetector {
 
 		// Initialize stroke map if it doesn't exist
 		if (!this.parentMap.has(strokeId)) {
-			console.log('Adding new strokeId to map:', strokeId);
 			this.parentMap.set(strokeId, new Map());
 		}
 
 		// Add the packet to the stroke map
 		const strokePackageMap = this.parentMap.get(strokeId);
 		strokePackageMap?.set(packageSequenceNumber, packet);
-
-		console.log('Packet added:', {
-			strokeId,
-			packageSequenceNumber,
-			isLastPacket,
-		});
 
 		// Check for gaps on every packet
 		return this.checkStrokeStatus(
@@ -67,10 +60,6 @@ export default class StrokePackageGapDetector {
 		strokeSequenceNumber?: number
 	): GapDetectionResult {
 		const gaps = this.detectGaps(strokeId, packageSequenceNumber);
-		// const strokeGaps = strokeSequenceNumber
-		// 	? this.detectStrokeGaps(strokeId, strokeSequenceNumber)
-		// 	: null;
-		console.log('Checking stroke:', strokeId, 'gaps:', gaps);
 
 		const isComplete = gaps.length === 0 && isLastPacket; // Complete only if no gaps AND it's the last packet
 
