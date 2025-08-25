@@ -1,8 +1,13 @@
+.gitignore
 node_modules
 server/.env
 client/.env
 todo.txt
 devblog.txt
+recall.txt
+.env
+client/.next/
+client/out/
 
 # Playwright
 /test-results/

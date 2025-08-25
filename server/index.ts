@@ -8,11 +8,13 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { Server } from 'socket.io';
 import * as dotenv from 'dotenv';
-// import StrokePackageGapDetector from './controllers/gapDetection';
+import allowedOrigins from './config/allowedOrigins';
+import SocketController from './controllers/socketController';
 const __dirname = path.dirname(process.argv[1]);
 const envPath = path.resolve(__dirname, '../.env');
 dotenv.config({ path: envPath });
 
+const PORT = process.argv[2] || 3000;
 const app = express();
 const httpServer = createServer(app);
 
@@ -23,49 +25,43 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+app.get('/', (req, res) => {
+	console.log('Received request at port', PORT);
+	return res.status(200).json({
+		server_port: PORT,
+	});
+});
+
 const io = new Server(httpServer, {
 	cors: {
-		origin: [
-			`${process.env.DEV_CLIENT_ORIGIN}`,
-			'https://admin.socket.io',
-			'http://localhost:3000',
-		],
-		methods: ['GET', 'POST'], //todo look if you need more methods allowed
+		origin: [...allowedOrigins],
+		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 		allowedHeaders: ['Content-Type'],
 		credentials: true,
 	},
+	transports: ['websocket', 'polling'],
+	allowEIO3: true,
 });
 
-// auth: { type: "basic", username: "admin", password: ""}); the server url is for the backend
-// todo add it before prod
+const socketController = new SocketController(io);
+socketController
+	.initialize()
+	.then(() => {
+		io.on(
+			'connection',
+			socketController.handleConnection.bind(socketController)
+		);
+		console.log('Socket.IO server ready for connections');
+	})
+	.catch((error) => {
+		console.error('Failed to initialize socket controller:', error);
+	});
+// todo add auth
 instrument(io, {
 	auth: false,
 	mode: 'development',
 });
-console.log('io.sockets.sockets', io.sockets.sockets);
 
-function terminateAllSockets() {
-	io.sockets.sockets.forEach((socket) => {
-		socket.disconnect(true);
-	});
-}
-
-io.on('connection', (socket) => {
-	console.log('New client connected:', socket.id);
-	socket.on('disconnect', () => {
-		console.log('Client disconnected:', socket.id);
-	});
-	socket.on('drawing-packet', (test, callback) => {
-		console.log('test', test);
-		callback({ status: 'received', timestamp: Date.now() });
-		socket.broadcast.emit('recieved-data', test);
-	});
-	socket.on('ping', (callback) => {
-		callback();
-	});
-});
-
-const PORT = 3000;
 httpServer.listen(PORT, () => {
 	console.log('connected at port: ', PORT);
 });

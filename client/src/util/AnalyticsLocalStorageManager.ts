@@ -80,15 +80,15 @@ class AnalyticsLocalStorageManager {
 			// If data is getting too large (>5MB), keep only recent items
 			if (sizeof(serialized) / (1024 * 1024) > 5) {
 				const recentData = data.slice(-1000); // Keep last 1000 items
-				localStorage.setItem(key, JSON.stringify(recentData));
-				console.warn(
-					`Storage size exceeded for ${key}, keeping recent ${recentData.length} items`
-				);
+				// localStorage.setItem(key, JSON.stringify(recentData));
+				// console.warn(
+				// 	`Storage size exceeded for ${key}, keeping recent ${recentData.length} items`
+				// );
 			} else {
-				localStorage.setItem(key, serialized);
+				// localStorage.setItem(key, serialized);
 			}
 		} catch (error) {
-			console.error(`Failed to store ${key}:`, error);
+			// console.error(`Failed to store ${key}:`, error);
 			this.handleStorageError(key, data);
 		}
 	}
@@ -98,7 +98,7 @@ class AnalyticsLocalStorageManager {
 			const data = localStorage.getItem(key);
 			return data ? JSON.parse(data) : [];
 		} catch (error) {
-			console.error(`Failed to retrieve ${key}:`, error);
+			// console.error(`Failed to retrieve ${key}:`, error);
 			return [];
 		}
 	}
@@ -110,10 +110,10 @@ class AnalyticsLocalStorageManager {
 	}
 
 	updateUserBehavior(behavior: UserBehaviorMetrics): void {
-		localStorage.setItem(
-			this.STORAGE_KEYS.USER_BEHAVIOR,
-			JSON.stringify(behavior)
-		);
+		// localStorage.setItem(
+		// 	this.STORAGE_KEYS.USER_BEHAVIOR,
+		// 	JSON.stringify(behavior)
+		// );
 	}
 
 	getUserBehavior(): UserBehaviorMetrics | null {
@@ -165,10 +165,10 @@ class AnalyticsLocalStorageManager {
 		if (Array.isArray(data) && data.length > 100) {
 			const reducedData = data.slice(-50);
 			try {
-				localStorage.setItem(key, JSON.stringify(reducedData));
-				console.warn(`Reduced ${key} data size and retried`);
+				// localStorage.setItem(key, JSON.stringify(reducedData));
+				// console.warn(`Reduced ${key} data size and retried`);
 			} catch {
-				console.error(`Critical storage error for ${key}`);
+				// console.error(`Critical storage error for ${key}`);
 			}
 		}
 	}

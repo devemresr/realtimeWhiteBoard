@@ -115,7 +115,7 @@ class DrawingAnalytics {
 	}
 
 	private startPeriodicSync(intervalMs: number): void {
-		console.log('startPeriodicSync');
+		// console.log('startPeriodicSync');
 
 		this.syncTimer = setInterval(async () => {
 			await this.syncNow();
@@ -124,7 +124,7 @@ class DrawingAnalytics {
 
 	// Manual sync trigger
 	async syncNow(): Promise<boolean> {
-		console.log('Starting analytics sync...');
+		// console.log('Starting analytics sync...');
 
 		// Queue current session data
 		this.storage.queueForSync(this.sessionId);
@@ -273,7 +273,7 @@ class DrawingAnalytics {
 
 				// Log performance warnings
 				if (fps < 30) {
-					console.warn(`Low FPS detected: ${fps.toFixed(1)}`);
+					// console.warn(`Low FPS detected: ${fps.toFixed(1)}`);
 				}
 				if (this.eventQueue.length > 10) {
 					console.warn(`Event queue backlog: ${this.eventQueue.length} events`);
@@ -317,7 +317,7 @@ class DrawingAnalytics {
 	emitWithLogging(
 		socket: any,
 		eventName: string,
-		data: any,
+		packageData: any,
 		options: {
 			timeout?: number;
 			retryCount?: number;
@@ -326,13 +326,15 @@ class DrawingAnalytics {
 	): Promise<boolean> {
 		return new Promise((resolve) => {
 			const startTime = performance.now();
-			const eventId = this.logDrawingEvent('stroke_continue', data);
-			const payloadSize = sizeof(data);
+			const eventId = this.logDrawingEvent('stroke_continue', packageData);
+			const payloadSize = sizeof(packageData);
 			let retryCount = 0;
 			const maxRetries = options.retryCount || 3;
 
 			const attempt = () => {
-				socket.emit(eventName, data, (ack: boolean) => {
+				console.log('packageData in emitWithLogging: ', packageData);
+
+				socket.emit(eventName, packageData, (ack: boolean) => {
 					this.logNetworkEvent(
 						eventId,
 						startTime,
@@ -345,14 +347,14 @@ class DrawingAnalytics {
 						resolve(true);
 					} else if (retryCount < maxRetries) {
 						retryCount++;
-						console.warn(
-							`Retrying event ${eventId} (attempt ${retryCount}/${maxRetries})`
-						);
+						// // console.warn(
+						// `Retrying event ${eventId} (attempt ${retryCount}/${maxRetries})`;
+						// // );
 						setTimeout(attempt, 100 * retryCount); // Exponential backoff
 					} else {
-						console.error(
-							`Event ${eventId} failed after ${maxRetries} retries`
-						);
+						// console.error(
+						// 	`Event ${eventId} failed after ${maxRetries} retries`
+						// );
 						resolve(false);
 					}
 				});
@@ -435,15 +437,15 @@ class DrawingAnalytics {
 	startRealtimeMonitoring(intervalMs: number = 5000): void {
 		setInterval(() => {
 			const summary = this.generateSummary();
-			console.log(
-				'Session Duration:',
-				`${Math.round(summary.sessionDuration / 1000)}s`
-			);
-			console.log('local storage', this.storage.getStorageInfo());
+			// console.log(
+			// 	'Session Duration:',
+			// 	`${Math.round(summary.sessionDuration / 1000)}s`
+			// );
+			// console.log('local storage', this.storage.getStorageInfo());
 
-			console.log('sum: ', summary);
+			// console.log('sum: ', summary);
 
-			console.groupEnd();
+			// console.groupEnd();
 		}, intervalMs);
 	}
 	// Cleanup

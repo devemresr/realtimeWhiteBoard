@@ -1,0 +1,60 @@
+# artillery-http-test.yml
+config:
+  target: 'http://localhost:8080'
+  phases:
+    # Warm-up phase duration is in seconds arrivalerate makes it so 5 new users every sec
+    - duration: 5
+      arrivalRate: 5
+      name: 'Warm-up'
+
+    # Main load test
+    - duration: 30
+      arrivalRate: 50
+      name: 'Main load test'
+
+    # Peak load test
+    - duration: 10
+      arrivalRate: 100
+      name: 'Peak load test'
+
+  # Custom headers to simulate different clients
+  defaults:
+    headers:
+      Connection: 'keep-alive'
+      User-Agent: 'Artillery-Test-{{ $uuid }}'
+
+scenarios:
+  # - name: 'HTTP Performance Test'
+  #   flow:
+  #     # Single request pattern for pure performance testing
+  #     - get:
+  #         url: '/'
+  #         name: 'homepage'
+
+  - name: 'Socket.IO Performance Test'
+    weight: 20
+    engine: socketio
+    flow:
+      - emit:
+          channel: 'DRAWING_PACKET'
+          data:
+            test: 'performance-data'
+            timestamp: '{{ $timestamp }}'
+          acknowledge:
+            timeout: 5000
+
+      # # Burst test scenario
+      # - name: 'Burst Test'
+      #   flow:
+      #     - loop:
+      #         - get:
+      #             url: '/'
+      #             name: 'burst-request'
+      #           count: 10
+      #       # No think time for maximum throughput testing
+
+      - get:
+          url: '/'
+          headers:
+            X-Forwarded-For: '192.168.1.{{ $randomInt(1, 100) }}'
+            X-Real-IP: '10.0.0.{{ $randomInt(1, 100) }}'
