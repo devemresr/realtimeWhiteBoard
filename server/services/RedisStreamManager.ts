@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { parseRedisFields } from '../utils/parseRedisField';
 
 interface RedisConfig {
 	host?: string;
@@ -21,7 +22,7 @@ type MessageHandler = (
 	streamName: string
 ) => Promise<void>;
 
-interface RedisMessage {
+export interface RedisMessage {
 	[key: string]: any;
 }
 interface RedisStreamMessage {
@@ -47,11 +48,6 @@ interface MessageData {
 interface StreamMessage {
 	id: string;
 	data: MessageData;
-}
-
-interface BatchMessage {
-	data: MessageData;
-	id?: string;
 }
 
 class RedisStreamManager {
@@ -121,7 +117,7 @@ class RedisStreamManager {
 							streamName,
 							messages: msgs.map(([messageId, fields]) => ({
 								messageId,
-								message: this.parseRedisFields(fields),
+								message: parseRedisFields(fields),
 							})),
 						})
 					)
@@ -192,7 +188,6 @@ class RedisStreamManager {
 			host: 'localhost',
 			port: 6379,
 			retryDelayOnFailover: 100,
-			enableReadyCheck: false,
 			maxRetriesPerRequest: 3,
 			...redisConfig,
 		};
@@ -200,7 +195,6 @@ class RedisStreamManager {
 		try {
 			if (this.redis) {
 				console.log('a redis instance is already exist quitting...');
-
 				await this.redis.quit();
 			}
 
@@ -208,9 +202,13 @@ class RedisStreamManager {
 
 			// Wait for connection
 			await new Promise<void>((resolve, reject) => {
-				this.redis!.on('connect', () => {
+				this.redis!.on('connecting', () => {
+					console.log(`Connecting to Redis for stream: ${this.streamName}`);
+				});
+
+				this.redis!.on('ready', () => {
 					this.isConnected = true;
-					console.log(`Connected to Redis for stream: ${this.streamName}`);
+					console.log(`Redis ready for stream: ${this.streamName}`);
 					resolve();
 				});
 
@@ -220,32 +218,19 @@ class RedisStreamManager {
 					reject(err);
 				});
 			});
+			await this.redis!.ping();
 
 			return this;
 		} catch (error) {
+			if (this.redis) {
+				await this.redis.quit().catch(() => {});
+				this.redis = null;
+			}
+			this.isConnected = false;
 			throw new Error(
 				`Failed to initialize Redis stream manager: ${(error as Error).message}`
 			);
 		}
-	}
-
-	/**
-	 * Convert Redis fields array to JavaScript object
-	 */
-	private parseRedisFields(fields: string[]): RedisMessage {
-		const obj: RedisMessage = {};
-
-		for (let i = 0; i < fields.length; i += 2) {
-			const key = fields[i];
-			const value = fields[i + 1];
-
-			try {
-				obj[key] = JSON.parse(value);
-			} catch {
-				obj[key] = value;
-			}
-		}
-		return obj;
 	}
 
 	/**
@@ -283,9 +268,9 @@ class RedisStreamManager {
 			const messageId = await this.redis.xadd(
 				...(args as [string, ...string[]])
 			);
-			console.log(
-				`Message added to stream '${this.streamName}' with ID: ${messageId}`
-			);
+			// console.log(
+			// 	`Message added to stream '${this.streamName}' with ID: ${messageId}`
+			// );
 			return messageId as string;
 		} catch (error) {
 			throw new Error(

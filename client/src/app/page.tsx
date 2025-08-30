@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, use, lazy } from 'react';
 import { io } from 'socket.io-client';
+import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
 const Canvas = lazy(() => import('../components/canvas'));
 import { Socket } from 'socket.io-client';
 
@@ -39,8 +40,16 @@ const whiteBoardApp = () => {
 			timeout: 20000, // Give 20 seconds to connect
 		});
 		socketRef.current = newSocket;
+
 		newSocket.on('connect', () => {
 			console.log('Connected with socket ID:', newSocket.id);
+			const test = 'test';
+			newSocket.emit(SOCKET_EVENTS.JOIN_ROOM, test, (ack: boolean) => {
+				if (ack) {
+					console.log('ack for joining a room:', ack);
+				}
+			});
+
 			setConnected(true);
 			setSocketId(newSocket.id);
 		});

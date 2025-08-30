@@ -4,6 +4,7 @@ type Point = {
 	timestamp?: number;
 };
 type StrokeData = {
+	roomId: string;
 	strokes: Point[];
 	strokeId: string;
 	packageSequenceNumber: number;

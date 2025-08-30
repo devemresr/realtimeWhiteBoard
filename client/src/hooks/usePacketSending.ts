@@ -8,7 +8,7 @@ const usePacketSending = (
 	socket: Socket | null,
 	analytics: React.MutableRefObject<DrawingAnalytics | null>
 ) => {
-	const POINTS_PER_PACKET = 5;
+	const POINTS_PER_PACKET = 10;
 	const INCOMPLETE_PACKAGE_TIMEOUT = 500;
 	const pointsBuffer = useRef<Point[]>([]);
 	const retryBuffer = useRef<StrokeData[]>([]);
@@ -38,6 +38,7 @@ const usePacketSending = (
 
 			const packageSequenceNumber = packageNumber.current++;
 			const strokeData: StrokeData = {
+				roomId: 'test',
 				strokes,
 				strokeId: strokeId.current,
 				packageSequenceNumber,

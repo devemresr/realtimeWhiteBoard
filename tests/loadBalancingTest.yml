@@ -36,10 +36,16 @@ scenarios:
     engine: socketio
     flow:
       - emit:
-          channel: 'DRAWING_PACKET'
+          channel: 'drawing-packet'
           data:
-            test: 'performance-data'
-            timestamp: '{{ $timestamp }}'
+            {
+              strokes: [{ x: 10, y: 20, timestamp: 1756126412223 }],
+              strokeSequenceNumber: 1,
+              strokeId: '17561264122131uuky5ksm',
+              packageSequenceNumber: 1,
+              isLastPackage: true,
+              roomId: 'test',
+            }
           acknowledge:
             timeout: 5000
 
