@@ -1,3 +1,8 @@
+export type Primitive = string | number | boolean | null;
+
+export type NestedObject = {
+	[key: string]: Primitive | NestedObject | Primitive[];
+};
 declare global {
 	namespace Express {
 		interface Request {
@@ -5,8 +10,7 @@ declare global {
 			accessToken?: string;
 			tokenRefreshNeeded?: boolean;
 			tokenIsBlacklisted?: boolean;
+			validatedQuery?: NestedObject;
 		}
 	}
 }
-
-export {};
