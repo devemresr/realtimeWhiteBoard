@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef, useEffect } from 'react';
 import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
 import DrawingAnalytics from '../util/DrawingAnalytics';

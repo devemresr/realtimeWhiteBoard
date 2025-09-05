@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef, useCallback, useEffect, Ref } from 'react';
 import { Socket } from 'socket.io-client';
 import { Point, StrokeData } from '../app/types_interfaces/DrawingTypes';

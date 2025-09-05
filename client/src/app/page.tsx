@@ -4,32 +4,81 @@ import React, { useState, useEffect, useRef, use, lazy } from 'react';
 import { io } from 'socket.io-client';
 import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
 const Canvas = lazy(() => import('../components/canvas'));
+import {
+	testProtectedRoute,
+	useLogin,
+	useRegisterUser,
+	UserRegistrationRequest,
+} from '../hooks/useFormPosts';
 import { Socket } from 'socket.io-client';
-
 const whiteBoardApp = () => {
 	const [connected, setConnected] = useState(false);
 	const [socketId, setSocketId] = useState('');
 	const socketRef = useRef<Socket | null>(null);
+	const [inputFields, setInputField] = useState<UserRegistrationRequest>({
+		email: '',
+		password: '',
+	});
 
-	// async function testFunc() {
-	// 	console.log('testFunc');
+	const { data, isLoading, error, refetch } = testProtectedRoute({
+		requiresAuth: true,
+		enabled: false,
+		url: '/auth/protectedRoute',
+	});
+	const testfunc = async (e) => {
+		e.preventDefault();
+		console.log('fetching...');
 
-	// 	const url = `${process.env.NEXT_PUBLIC_DEV_SERVER_URL}/`;
-	// 	try {
-	// 		const starttime = Date.now();
-	// 		console.log('fetchin');
+		const result = await refetch();
+		console.log('result', result, 'isLoading', isLoading);
+	};
 
-	// 		const response = await fetch(url);
-	// 		const endtime = Date.now();
-	// 		console.log('response, time:', endtime - starttime, response);
-	// 	} catch (error) {
-	// 		console.error(error.message, 'HERE');
-	// 		console.log('err');
-	// 	}
-	// }
-	// useEffect(() => {
-	// 	testFunc();
-	// }, []);
+	const [inputFieldsForLogin, setInputFieldsForLogin] =
+		useState<UserRegistrationRequest>({
+			email: '',
+			password: '',
+		});
+	const handleChange = (e) => {
+		const { name, value } = e.target;
+		setInputField((prevState) => ({
+			...prevState,
+			[name]: value,
+		}));
+	};
+	const handleChangeForLogin = (e) => {
+		const { name, value } = e.target;
+		setInputFieldsForLogin((prevState) => ({
+			...prevState,
+			[name]: value,
+		}));
+	};
+
+	const registerUser = useRegisterUser();
+	async function handleRegister(e) {
+		e.preventDefault();
+
+		registerUser.mutate(inputFields, {
+			onSuccess: (data) => {
+				console.log('Registered!', data);
+			},
+			onError: (err) => {
+				console.error('Failed:', err);
+			},
+		});
+	}
+	const loginUser = useLogin();
+	async function handleLogin(e) {
+		e.preventDefault();
+
+		loginUser.mutate(inputFieldsForLogin, {
+			onSuccess: (data) => {
+				console.log('Registered!', data);
+			},
+			onError: (err) => {
+				console.error('Failed:', err);
+			},
+		});
+	}
 
 	useEffect(() => {
 		const newSocket = io(`${process.env.NEXT_PUBLIC_DEV_SERVER_URL}`, {
@@ -86,6 +135,73 @@ const whiteBoardApp = () => {
 
 	return (
 		<>
+			<div className='flex '>
+				<label className='flex items-center gap-2'>
+					email:
+					<input
+						type='text'
+						name='email'
+						min='1'
+						max='50'
+						value={inputFields.email}
+						onChange={handleChange}
+						className='w-20'
+					/>
+				</label>
+				<label className='flex items-center gap-2'>
+					password:
+					<input
+						type='text'
+						name='password'
+						min='1'
+						max='50'
+						value={inputFields.password}
+						onChange={handleChange}
+						className='w-20'
+					/>
+				</label>
+				<button
+					className='bg-red-400 px-2'
+					onClick={handleRegister}
+					disabled={registerUser.isPending}
+				>
+					send
+				</button>
+				<label className='flex items-center gap-2'>
+					email:
+					<input
+						type='text'
+						name='email'
+						min='1'
+						max='50'
+						value={inputFieldsForLogin.email}
+						onChange={handleChangeForLogin}
+						className='w-20'
+					/>
+				</label>
+				<label className='flex items-center gap-2'>
+					password:
+					<input
+						type='text'
+						name='password'
+						min='1'
+						max='50'
+						value={inputFieldsForLogin.password}
+						onChange={handleChangeForLogin}
+						className='w-20'
+					/>
+				</label>
+				<button
+					className='bg-red-400 px-2'
+					onClick={handleLogin}
+					disabled={registerUser.isPending}
+				>
+					send
+				</button>
+				<button className='bg-red-400 px-2 ml-6' onClick={testfunc}>
+					fetch protected
+				</button>
+			</div>
 			{connected ? `connected with id: ${socketId}` : 'didnt connect '}
 			<Canvas socket={socketRef.current} />
 		</>

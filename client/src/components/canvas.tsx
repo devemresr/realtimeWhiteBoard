@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
 import DrawingAnalytics from '../util/DrawingAnalytics';

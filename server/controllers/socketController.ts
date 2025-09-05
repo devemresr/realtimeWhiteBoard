@@ -4,15 +4,14 @@ import {
 } from '../../shared/constants/socketIoConstants';
 import { Socket } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { createClient, createCluster } from 'redis';
+import { createClient } from 'redis';
 import { Server } from 'socket.io';
 import RedisStreamManager from '../services/RedisStreamManager';
 import Redis from 'ioredis';
-import { parseRedisFields } from '../utils/parseRedisField';
-import TokenBucket from '../services/tokenBucket';
+import TokenBucket from '../services/TokenBucket';
 import socketRateLimitMiddleware from '../middleware/socketRateLimitMiddleware';
 
-const REDIS_CONFIG = {
+export const REDIS_CONFIG = {
 	host: 'localhost',
 	port: 6379,
 	retryDelayOnFailover: 100,
@@ -61,7 +60,7 @@ class SocketController {
 				this.redis,
 				userId,
 				10000, // tokenCap
-				0, // refillRate (tokens per second)
+				2000, // refillRate (tokens per second)
 				1000 // cost per request
 			);
 			this.tokenBuckets.set(userId, bucket);

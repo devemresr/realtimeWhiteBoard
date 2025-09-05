@@ -1,5 +1,5 @@
 import { NextFunction } from 'express';
-import TokenBucket from '../services/tokenBucket';
+import TokenBucket from '../services/TokenBucket';
 import { Socket } from 'socket.io';
 import { error } from 'console';
 

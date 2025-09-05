@@ -7,7 +7,6 @@ const corsOptions = {
 	) => {
 		console.log('Origin:', origin);
 		const timestamp = new Date().toISOString();
-		console.log('process.env.ENVIRONMENT ', process.env.ENVIRONMENT);
 		if (
 			(origin && allowedOrigins.indexOf(origin) !== -1) ||
 			// todo delete in prod

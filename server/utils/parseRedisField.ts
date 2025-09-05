@@ -5,6 +5,7 @@ import { RedisMessage } from '../services/RedisStreamManager';
  */
 function parseRedisFields(fields: string[] | string): RedisMessage {
 	const obj: RedisMessage = {};
+	console.log('fields: in parseRedisField ', fields);
 
 	console.log('fields.length', fields.length);
 

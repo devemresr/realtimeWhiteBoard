@@ -80,7 +80,6 @@ class TokenBucket {
 				this.refillRate.toString(),
 				this.cost.toString()
 			)) as number;
-			console.log('HERE RESULTS', result);
 
 			const msPerToken = 1000 / this.refillRate;
 			const retryAfter = Math.ceil(this.cost * msPerToken);

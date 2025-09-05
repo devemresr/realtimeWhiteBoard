@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { Point } from '../app/types_interfaces/DrawingTypes';
 
