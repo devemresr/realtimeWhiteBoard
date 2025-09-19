@@ -31,21 +31,32 @@ const usePacketSending = (
 	}, []);
 
 	const sendPackage = useCallback(
-		(
-			strokes: Point[],
-			isLastPackage?: boolean,
-			strokeSequenceNumber?: number
-		) => {
+		({
+			strokes,
+			strokeSequenceNumber,
+			isLastPackage,
+		}: {
+			strokes: Point[];
+			strokeSequenceNumber?: number;
+			isLastPackage?: boolean;
+		}) => {
+			console.log('sendpacket');
+
 			if (!socket) return;
 
 			const packageSequenceNumber = packageNumber.current++;
+			const rooms = ['room1', 'room2', 'room3', 'room4'];
+			const randomIndex = Math.floor(Math.min(Math.random() * 10, 3));
+			const randomRoom = rooms[randomIndex];
+
 			const strokeData: StrokeData = {
-				roomId: 'test',
+				roomId: randomRoom,
 				strokes,
 				strokeId: strokeId.current,
 				packageSequenceNumber,
 				...(isLastPackage && { isLastPackage: true }),
-				...(strokeSequenceNumber !== undefined && { strokeSequenceNumber }),
+				strokeSequenceNumber,
+				packageId: `${strokeId.current}-${packageSequenceNumber}`,
 			};
 
 			retryBuffer.current.push(strokeData);
@@ -70,7 +81,8 @@ const usePacketSending = (
 					0,
 					pointsBuffer.current.length
 				);
-				sendPackage(strokes);
+				const strokeSequenceNumber = strokeNumber.current;
+				sendPackage({ strokes, strokeSequenceNumber });
 			}, INCOMPLETE_PACKAGE_TIMEOUT);
 		}
 	}, [clearIncompletePacketTimeout, sendPackage]);
@@ -90,7 +102,8 @@ const usePacketSending = (
 			// Send complete packets immediately
 			for (let i = 0; i < packageThreshold; i++) {
 				const strokes = pointsBuffer.current.splice(0, POINTS_PER_PACKET);
-				sendPackage(strokes);
+				const strokeSequenceNumber = strokeNumber.current;
+				sendPackage({ strokes, strokeSequenceNumber });
 			}
 		} else {
 			// Set timeout for remaining incomplete packet (if any)
@@ -101,10 +114,12 @@ const usePacketSending = (
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
+			console.log('cleanup ran');
 			if (incompletePacketTimeout.current) {
 				clearIncompletePacketTimeout();
 				const strokes = pointsBuffer.current.splice(0);
-				sendPackage(strokes, true, strokeNumber.current++);
+				const strokeSequenceNumber = strokeNumber.current++;
+				sendPackage({ strokes, strokeSequenceNumber });
 			}
 		};
 	}, [clearIncompletePacketTimeout, sendPackage]);

@@ -347,14 +347,14 @@ class DrawingAnalytics {
 						resolve(true);
 					} else if (retryCount < maxRetries) {
 						retryCount++;
-						// // console.warn(
-						// `Retrying event ${eventId} (attempt ${retryCount}/${maxRetries})`;
-						// // );
+						console.warn(
+							`Retrying event ${eventId} (attempt ${retryCount}/${maxRetries})`
+						);
 						setTimeout(attempt, 100 * retryCount); // Exponential backoff
 					} else {
-						// console.error(
-						// 	`Event ${eventId} failed after ${maxRetries} retries`
-						// );
+						console.error(
+							`Event ${eventId} failed after ${maxRetries} retries`
+						);
 						resolve(false);
 					}
 				});

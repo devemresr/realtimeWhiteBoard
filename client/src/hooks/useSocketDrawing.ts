@@ -19,14 +19,6 @@ const useSocketDrawing = (socket, drawBroadcastPath) => {
 
 			const isFirstPackage = data.data.messageData.packageSequenceNumber === 1;
 			const isLastPackage = data.data.messageData.isLastPackage;
-			console.log(
-				'isFirstPackage',
-				isFirstPackage,
-				'isLastPackage',
-				isLastPackage,
-				'data.data.messageData',
-				data.data.messageData
-			);
 
 			drawBroadcastPath(
 				data.data.messageData.strokes,

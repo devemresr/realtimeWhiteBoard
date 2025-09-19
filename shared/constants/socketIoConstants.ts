@@ -5,7 +5,7 @@ export const SOCKET_EVENTS = {
 	LEAVE_ROOM: 'leave-room',
 } as const;
 
-export const REDIS_STREAM_EVENTS = {
-	COMPLETED_DRAWING_EVENT: 'completedDrawingEvents',
-	DRAWING_EVENT: 'drawingEvents',
+export const REDIS_STREAMS = {
+	DRAWING_EVENTS: 'drawing:events',
+	COMPLETED_DRAWING_EVENTS: 'drawing:completed',
 } as const;

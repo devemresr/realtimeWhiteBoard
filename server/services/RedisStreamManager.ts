@@ -124,17 +124,10 @@ class RedisStreamManager {
 				: null;
 
 			try {
-				// Read pending messages first (messages that were delivered but not acknowledged)
-				// await this.processPendingMessages(
-				// 	stream,
-				// 	group,
-				// 	messageHandler,
-				// 	processingTimeout
-				// );
+				// todo Read pending messages first (messages that were delivered but not acknowledged)
 
 				// Read new messages
 				if (messages && messages.length > 0) {
-					console.log('messages: ', messages);
 					for (const item of messages) {
 						const streamName = item.streamName;
 
@@ -146,20 +139,6 @@ class RedisStreamManager {
 							await this.redis!.xack(stream, group, messageId);
 						}
 					}
-
-					// 				// Convert Redis fields array to object
-					// 				const messageData = this.parseRedisFields(fields);
-					// 				// // Acknowledge the message
-					// 				// Process the message
-					// 			} catch (processingError) {
-					// 				console.error(
-					// 					`❌ Error processing message ${messageId}:`,
-					// 					processingError
-					// 				);
-					// 				// You might want to implement dead letter queue logic here
-					// 			}
-					// 		}
-					// 	}
 				}
 			} catch (error) {
 				console.error('❌ Error in consumer loop:', error);
@@ -194,7 +173,6 @@ class RedisStreamManager {
 
 		try {
 			if (this.redis) {
-				console.log('a redis instance is already exist quitting...');
 				await this.redis.quit();
 			}
 
@@ -239,7 +217,7 @@ class RedisStreamManager {
 	 * @param id - Optional custom ID, defaults to '*' (auto-generated)
 	 * @param options - Optional parameters like MAXLEN
 	 */
-	public async addMessage(
+	public async addMessageToStream(
 		data: any,
 		id: string = '*',
 		options: StreamOptions = {}
@@ -303,7 +281,6 @@ class RedisStreamManager {
 				'COUNT',
 				count
 			);
-			console.log('READ MESSAGES', messages);
 
 			return messages.map(([id, fields]) => ({
 				id,
@@ -369,109 +346,6 @@ class RedisStreamManager {
 			console.log('Redis connection closed');
 		}
 	}
-
-	// private async processPendingMessages(
-	// 	stream: string,
-	// 	group: string,
-	// 	messageHandler: MessageHandler,
-	// 	timeout: number
-	// ): Promise<void> {
-	// 	try {
-	// 		const pending = await this.redis!.xpending(
-	// 			stream,
-	// 			group,
-	// 			'-',
-	// 			'+',
-	// 			10,
-	// 			this.consumerName
-	// 		);
-
-	// 		if (pending && pending.length > 0) {
-	// 			for (const pendingMessage of pending) {
-	// 				const [messageId, consumerName, idleTime] = pendingMessage as [
-	// 					string,
-	// 					string,
-	// 					number,
-	// 				];
-
-	// 				if (idleTime > timeout) {
-	// 					const claimedMessages = await this.redis!.xclaim(
-	// 						stream,
-	// 						group,
-	// 						this.consumerName,
-	// 						timeout.toString(),
-	// 						messageId
-	// 					);
-
-	// 					if (claimedMessages && claimedMessages.length > 0) {
-	// 						const [claimedId, fields] = claimedMessages[0] as [
-	// 							string,
-	// 							string[],
-	// 						];
-
-	// 						const messageData = this.parseRedisFields(fields);
-
-	// 						try {
-	// 							await messageHandler(messageData, claimedId, stream);
-
-	// 							await this.redis!.xack(stream, group, claimedId);
-	// 						} catch (error) {
-	// 							console.error(
-	// 								`❌ Error processing claimed message ${claimedId}:`,
-	// 								error
-	// 							);
-	// 						}
-	// 					}
-	// 				}
-	// 			}
-	// 		}
-	// 	} catch (error) {
-	// 		console.error('❌ Error processing pending messages:', error);
-	// 	}
-	// }
-	/**
-	 * Add multiple messages in a pipeline for better performance
-	 * @param messages - Array of message objects
-	 * @param options - Optional parameters
-	 */
-	// public async addMessages(
-	// 	messages: BatchMessage[],
-	// 	options: StreamOptions = {}
-	// ): Promise<string[]> {
-	// 	if (!this.isConnected || !this.redis) {
-	// 		throw new Error('Redis not connected. Call initialize() first.');
-	// 	}
-
-	// 	try {
-	// 		const pipeline = this.redis.pipeline();
-
-	// 		messages.forEach((message) => {
-	// 			const flatData = Object.entries(message.data).flat().map(String);
-	// 			let args: string[] = [this.streamName!];
-
-	// 			if (options.maxLen) {
-	// 				args.push('MAXLEN');
-	// 				if (options.approximate) {
-	// 					args.push('~');
-	// 				}
-	// 				args.push(options.maxLen.toString());
-	// 			}
-
-	// 			args.push(message.id || '*', ...flatData);
-	// 			pipeline.xadd(...(args as [string, ...string[]]));
-	// 		});
-
-	// 		const results = await pipeline.exec();
-	// 		console.log(
-	// 			`${results!.length} messages added to stream '${this.streamName}'`
-	// 		);
-	// 		return results!.map((result) => result[1] as string); // Extract message IDs
-	// 	} catch (error) {
-	// 		throw new Error(
-	// 			`Failed to add messages to stream: ${(error as Error).message}`
-	// 		);
-	// 	}
-	// }
 }
 
 export default RedisStreamManager;

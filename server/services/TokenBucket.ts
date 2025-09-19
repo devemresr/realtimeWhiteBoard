@@ -13,6 +13,7 @@ class TokenBucket {
 	private tokenCap: number;
 	private refillRate: number;
 	private cost: number;
+	private TTLforBuckets: number;
 	private keyPrefix: string = 'rate_limit:';
 
 	constructor(
@@ -20,13 +21,15 @@ class TokenBucket {
 		userId: string,
 		tokenCap: number = 10000,
 		refillRate: number = 1000,
-		cost: number = 1000
+		cost: number = 1000,
+		TTLforBuckets: number = 3600
 	) {
 		this.redis = redis;
 		this.userId = userId;
 		this.tokenCap = tokenCap;
 		this.refillRate = refillRate;
 		this.cost = cost;
+		this.TTLforBuckets = TTLforBuckets;
 	}
 
 	private getRedisKey(): string {
@@ -44,6 +47,7 @@ class TokenBucket {
       local capacity = tonumber(ARGV[2])
       local refill_rate = tonumber(ARGV[3])
       local cost = tonumber(ARGV[4])
+      local TTLforBuckets = tonumber(ARGV[5])
       
       -- Get current state in lua arrays start at 1
       local bucket = redis.call('HMGET', key, 'tokens', 'last_refill')
@@ -60,12 +64,12 @@ class TokenBucket {
         tokens = tokens - cost
         -- Update state
         redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
-        redis.call('EXPIRE', key, 3600) -- expire after 1 hour of inactivity
+        redis.call('EXPIRE', key, TTLforBuckets) -- expire after 1 hour of inactivity (the default)
         return 1 -- allowed
       else
         -- Update state even if not consuming (for accurate refill tracking)
         redis.call('HMSET', key, 'tokens', tokens, 'last_refill', now)
-        redis.call('EXPIRE', key, 3600)
+        redis.call('EXPIRE', key, TTLforBuckets)
         return 0 -- not allowed
       end
     `;
@@ -78,7 +82,8 @@ class TokenBucket {
 				now.toString(),
 				this.tokenCap.toString(),
 				this.refillRate.toString(),
-				this.cost.toString()
+				this.cost.toString(),
+				this.TTLforBuckets
 			)) as number;
 
 			const msPerToken = 1000 / this.refillRate;
@@ -144,10 +149,10 @@ class TokenBucket {
 	}
 
 	// shorten TTL of Redis data when user disconnects
-	public async cleanup(): Promise<void> {
+	public async cleanup(TTLforCleanUp: number = 3600): Promise<void> {
 		const key = this.getRedisKey();
 		try {
-			await this.redis.expire(key, 60 * 10);
+			await this.redis.expire(key, TTLforCleanUp);
 			console.log(`Cleaned up Redis data for user ${this.userId}`);
 		} catch (error) {
 			console.error(

@@ -104,7 +104,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 
 			const strokeSequenceNumber = strokeNumber.current++;
 			const isLastPackage = true;
-			sendPackage(strokes, isLastPackage, strokeSequenceNumber);
+			sendPackage({ strokes, isLastPackage, strokeSequenceNumber });
 		} else {
 			const strokeSequenceNumber = strokeNumber.current++;
 			const strokes = pointsBuffer.current.splice(
@@ -112,7 +112,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				pointsBuffer.current.length
 			);
 			const isLastPackage = true;
-			sendPackage(strokes, isLastPackage, strokeSequenceNumber);
+			sendPackage({ strokes, isLastPackage, strokeSequenceNumber });
 		}
 
 		setIsDrawing(false);

@@ -1,5 +1,5 @@
 import {
-	REDIS_STREAM_EVENTS,
+	REDIS_STREAMS,
 	SOCKET_EVENTS,
 } from '../../shared/constants/socketIoConstants';
 import { Socket } from 'socket.io';
@@ -20,11 +20,9 @@ export const REDIS_CONFIG = {
 
 class SocketController {
 	private io: Server;
-	private readStreamManager: RedisStreamManager; // For consuming
 	private writeStreamManager: RedisStreamManager; // For writing
 	private subClient: any;
 	private pubClient: any;
-	private isStreamConsumerSetup: boolean = false;
 	private redis: Redis;
 	private initialized: boolean = false;
 	private tokenBuckets = new Map<string, TokenBucket>();
@@ -32,7 +30,6 @@ class SocketController {
 	constructor(io: Server) {
 		this.io = io;
 		this.redis = new Redis(REDIS_CONFIG);
-		this.readStreamManager = new RedisStreamManager();
 		this.writeStreamManager = new RedisStreamManager();
 		this.handleConnection = this.handleConnection.bind(this);
 		this.handleDrawingPacket = this.handleDrawingPacket.bind(this);
@@ -112,7 +109,6 @@ class SocketController {
 		}
 	}
 
-	// todo look for SIGINT and SIGTERM
 	private async setupRedisEventHandlers() {
 		const clients = [this.pubClient, this.subClient];
 		clients.forEach((client) => {
@@ -138,49 +134,10 @@ class SocketController {
 	// Initialize Redis streams once for the entire server
 	private async initializeStreams() {
 		try {
-			await this.writeStreamManager.initialize(
-				REDIS_STREAM_EVENTS.DRAWING_EVENT
-			);
-			await this.readStreamManager.initialize(
-				REDIS_STREAM_EVENTS.COMPLETED_DRAWING_EVENT
-			);
+			await this.writeStreamManager.initialize(REDIS_STREAMS.DRAWING_EVENTS);
 			console.log('streams inited');
-
-			try {
-				await this.readStreamManager.createConsumerGroup(
-					REDIS_STREAM_EVENTS.COMPLETED_DRAWING_EVENT,
-					'testSocketServers'
-				);
-			} catch (error) {
-				console.log('err: ', error);
-
-				// Consumer group might already exist - check if it's a BUSYGROUP error
-				if (!(error as Error).message?.includes('BUSYGROUP')) {
-					throw error;
-				}
-				console.log('Consumer group already exists, continuing...');
-			}
-
-			// Set up consumer only once for the entire server
-			if (!this.isStreamConsumerSetup) {
-				this.setupStreamConsumer();
-				this.isStreamConsumerSetup = true;
-			}
 		} catch (error) {
 			console.error('Failed to initialize streams:', error);
-		}
-	}
-
-	private async setupStreamConsumer() {
-		try {
-			await this.readStreamManager.consumeFromGroup(
-				REDIS_STREAM_EVENTS.COMPLETED_DRAWING_EVENT,
-				'testSocketServers',
-				this.handleDrawingPacket
-			);
-		} catch (error) {
-			console.error('Stream consumer setup failed:', error);
-			const retries = 0;
 		}
 	}
 
@@ -211,6 +168,12 @@ class SocketController {
 		// todo atp i dont have an actual userid so were opting out for socketid for dev purposes.
 		socket.use(socketRateLimitMiddleware(socket, tokenBucket, () => {}));
 		socket.on(SOCKET_EVENTS.DRAWING_PACKET, async (data, callback) => {
+			console.log('data hHE', data);
+
+			// save the recent roomdata into the redis
+			const { roomId } = data;
+			await this.redis.sadd(roomId, data);
+
 			console.log('left tokens: ', await tokenBucket.getRemainingTokens());
 			this.handleRedisStreamWriteUp(socket, data, callback);
 		});
@@ -237,9 +200,8 @@ class SocketController {
 		callback?: Function
 	) {
 		try {
-			await this.writeStreamManager.addMessage({
+			await this.writeStreamManager.addMessageToStream({
 				socketId: socket.id,
-				timestamp: Date.now(),
 				messageData,
 			});
 

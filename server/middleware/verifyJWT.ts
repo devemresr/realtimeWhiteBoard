@@ -2,7 +2,6 @@ import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import TokenStore from '../services/TokenStore';
 import { AccessTokenPayload } from './refreshAccessToken';
-import { tree } from 'next/dist/build/templates/app-page';
 
 const verifyJWT = async (req: Request, res: Response, next: NextFunction) => {
 	try {
