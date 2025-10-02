@@ -16,19 +16,16 @@ const useSocketDrawing = (socket, drawBroadcastPath) => {
 
 		const handleDrawingPacket = (data) => {
 			console.log('RECEIVED_DATA: ', data);
-
-			const isFirstPackage = data.data.messageData.packageSequenceNumber === 1;
-			const isLastPackage = data.data.messageData.isLastPackage;
-
-			drawBroadcastPath(
-				data.data.messageData.strokes,
-				isFirstPackage,
-				isLastPackage
-			);
+			const isFirstPackage = data.packageSequenceNumber === 1;
+			const isLastPackage = data.isLastPackage;
+			drawBroadcastPath(data.strokes, isFirstPackage, isLastPackage);
 		};
 
-		socket.on(`${SOCKET_EVENTS.RECEIVED_DATA}`, handleDrawingPacket);
-		return () => socket.off(`${SOCKET_EVENTS.RECEIVED_DATA}`);
+		socket.on(
+			`${SOCKET_EVENTS.BROADCASTING_DRAWING_DATA}`,
+			handleDrawingPacket
+		);
+		return () => socket.off(`${SOCKET_EVENTS.BROADCASTING_DRAWING_DATA}`);
 	}, [socket, drawBroadcastPath]);
 
 	return { analytics };

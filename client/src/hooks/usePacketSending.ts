@@ -50,7 +50,8 @@ const usePacketSending = (
 			const randomRoom = rooms[randomIndex];
 
 			const strokeData: StrokeData = {
-				roomId: randomRoom,
+				// roomId: randomRoom,
+				roomId: 'room1',
 				strokes,
 				strokeId: strokeId.current,
 				packageSequenceNumber,
