@@ -20,6 +20,7 @@ const socketRateLimitMiddleware = (
 ) => {
 	return async (packet: any[], next: (err?: RateLimitError) => void) => {
 		const result = await tokenBucket.spendToken();
+		console.log('rate limit result: ', result);
 
 		if (!result.allowed) {
 			return next(

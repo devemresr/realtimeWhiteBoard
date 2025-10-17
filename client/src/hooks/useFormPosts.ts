@@ -27,6 +27,15 @@ export function useLogin() {
 		method: 'POST',
 	});
 }
+
+export function useGetOnboardingData(apiType?: string) {
+	return useApiMutation({
+		url: '/onboard',
+		method: 'GET',
+		...(apiType && { apiType }),
+	});
+}
+
 export function testProtectedRoute(config: QueryConfig) {
 	return useApiQuery({
 		url: config.url,

@@ -33,13 +33,10 @@ async function startServer() {
 	try {
 		// Start mongoDB
 		if (!process.env.MONGODB_URI) {
-			throw new Error('process.env.MONGODB_URI is not set');
-		}
-		const mongoUri = process.env.MONGODB_URI;
-		if (!mongoUri) {
 			console.error('MONGODB_URI is not defined in environment variables.');
 			process.exit(1);
 		}
+		const mongoUri = process.env.MONGODB_URI;
 
 		await mongoose.connect(mongoUri);
 		console.log('MongoDB connected');

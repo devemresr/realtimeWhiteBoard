@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
-import { addMessageWithInflightTracking } from '../scripts/addMessageWithInflightTracking';
+// import { addMessageWithInflightTracking } from '../scripts/addMessageWithInflightTracking';
+import { REDIS_STREAMS } from '../../shared/constants/socketIoConstants';
 
 interface StreamOptions {
 	maxLen?: number;
@@ -22,29 +23,10 @@ interface StreamMessage {
 class RedisStreamManager {
 	private redis: Redis | null = null;
 	private streamName: string | null = null;
-	private consumerName: string;
 
 	constructor(redis: Redis) {
 		this.redis = redis;
-		this.consumerName = process.env.CONSUMER_NAME || `consumer-${process.pid}`;
-	}
-
-	/**
-	 * Create consumer group if it doesn't exist
-	 * @param {string} stream - Stream name
-	 * @param {string} group - Consumer group name
-	 * @param {string} startId - Starting position ('0' for beginning, '$' for new messages)
-	 */
-	async createConsumerGroup(stream: string, group: string, startId = '0') {
-		try {
-			await this.redis!.xgroup('CREATE', stream, group, startId, 'MKSTREAM');
-			console.log(`Consumer group '${group}' created for stream '${stream}'`);
-		} catch (error) {
-			console.log(
-				`Consumer group '${group}' already exists for stream '${stream}' the error: `,
-				error
-			);
-		}
+		this.streamName = REDIS_STREAMS.DRAWING_EVENTS;
 	}
 
 	/**
@@ -64,12 +46,10 @@ class RedisStreamManager {
 
 		try {
 			// Convert object to redis appropriate string
-			const { roomId } = data;
-			const flatData = JSON.stringify(data);
+			const { roomId, packageId, packageSequenceNumber, strokes } = data;
+			let args: string[] = [];
 
-			let args: string[] = [this.streamName!];
-
-			// Add MAXLEN option if specified
+			// MAXLEN options if needed
 			if (options.maxLen) {
 				args.push('MAXLEN');
 				if (options.approximate) {
@@ -78,26 +58,45 @@ class RedisStreamManager {
 				args.push(options.maxLen.toString());
 			}
 
-			args.push(id, 'data', flatData); // redisio only allows data as the fieldname
+			// Multiple field-value pairs
+			args.push(
+				'roomId',
+				roomId,
+				'strokeId',
+				data.strokeId,
+				'packageSequenceNumber',
+				packageSequenceNumber.toString(),
+				'strokeSequenceNumber',
+				data.strokeSequenceNumber.toString(),
+				'packageId',
+				packageId,
+				'originalSocketId',
+				data.originalSocketId,
+				'strokes',
+				JSON.stringify(strokes) // Keep array as JSON
+			);
 
-			console.log('data', data, 'args', args);
+			if (data.isLastPackage) {
+				args.push('isLastPackage', data.isLastPackage.toString());
+			}
 
-			const response = await this.redis
-				.eval(addMessageWithInflightTracking, 1, roomId, ...args)
-				.then((i) => JSON.parse(i as string));
-			const { result, messageId } = response;
-			console.log('the inflight resutl', response);
+			const redisMessageId = await this.redis.xadd(
+				this.streamName!,
+				'*',
+				...args
+			);
+			console.log('redisMessageId', redisMessageId);
 
-			if (!result) {
+			if (!redisMessageId) {
 				console.error('adding to the stream failed');
-				throw new Error(`failed messageId ${messageId}`);
+				throw new Error(`failed messageId ${redisMessageId}`);
 			}
 
 			console.log(
-				`Message added to stream '${this.streamName}' with ID: ${messageId}`
+				`Message added to stream '${this.streamName}' with ID: ${redisMessageId}`
 			);
 
-			return messageId as string;
+			return redisMessageId as string;
 		} catch (error) {
 			throw new Error(
 				`Failed to add message to stream: ${(error as Error).message}`

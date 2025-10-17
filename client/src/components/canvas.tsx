@@ -38,6 +38,26 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		drawDotOnCanvas,
 	} = useCanvasDrawing(canvasRef, brushColor, brushSize);
 
+	const getBoardingData = useGetOnboardingData('http://localhost:3010');
+	async function getOnboardingData(e) {
+		e.preventDefault();
+		getBoardingData.mutate(null, {
+			onSuccess: (data: any) => {
+				data.data
+					.flatMap((i) => i)
+					.forEach((element) => {
+						const msg = element.data;
+						const isFirstPackage = msg.packageSequenceNumber === 1;
+						const isLastPackage = msg.isLastPackage;
+						drawBroadcastPath(msg.strokes, isFirstPackage, isLastPackage);
+					});
+			},
+			onError: (err) => {
+				console.error('Failed:', err);
+			},
+		});
+	}
+
 	const { analytics } = useSocketDrawing(socket, drawBroadcastPath);
 	const {
 		pointsBuffer,

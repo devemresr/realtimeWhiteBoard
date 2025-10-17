@@ -7,7 +7,6 @@ import { Socket } from 'socket.io';
 import { Server } from 'socket.io';
 import RedisStreamManager from '../services/RedisStreamManager';
 import Redis from 'ioredis';
-import TokenBucket from '../services/TokenBucket';
 import socketRateLimitMiddleware from '../middleware/socketRateLimitMiddleware';
 import TokenBucketManager from '../services/TokenBucketManager';
 
@@ -63,7 +62,7 @@ class SocketController {
 		socket.on(SOCKET_EVENTS.DRAWING_PACKET, async (data, callback) => {
 			console.log('left tokens: ', await tokenBucket.getRemainingTokens());
 			this.handleRedisStreamWriteUp(socket, data, callback);
-			this.handleDrawingPacket(data);
+			this.handleDrawingPacket(socket, data);
 		});
 
 		socket.on(SOCKET_EVENTS.JOIN_ROOM, (roomId: string, callback) => {
@@ -111,7 +110,7 @@ class SocketController {
 	}
 
 	// Handle drawing packet from Redis stream
-	private async handleDrawingPacket(redisMessage: any) {
+	private async handleDrawingPacket(socket: Socket, redisMessage: any) {
 		let roomId: string | undefined;
 		try {
 			console.log('redisMessage: ', redisMessage);
@@ -123,7 +122,8 @@ class SocketController {
 			}
 
 			// Broadcast to specific room across all servers
-			const { originalSocketId } = redisMessage;
+			const originalSocketId = socket.id;
+			console.log('originalSocketId', originalSocketId);
 
 			this.io
 				.to(roomId)

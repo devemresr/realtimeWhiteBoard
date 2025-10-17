@@ -19,10 +19,8 @@ export default function useApiQuery<TData = any, TError = ApiError>(
 ) {
 	const shouldDisableForSSR =
 		config.requiresAuth && typeof window === 'undefined';
-	const finalEnabled =
-		config.enabled !== undefined
-			? config.enabled && !shouldDisableForSSR
-			: !shouldDisableForSSR;
+	const finalEnabled = (config.enabled ?? true) && !shouldDisableForSSR;
+
 	return useQuery<TData, TError>({
 		queryKey: [config.url, config.params],
 		queryFn: async () => {
@@ -47,7 +45,6 @@ export default function useApiQuery<TData = any, TError = ApiError>(
 					).toString();
 			}
 
-			const headers: Record<string, string> = {};
 			const response = await fetch(
 				`${process.env.NEXT_PUBLIC_DEV_SERVER_URL}${config.url}${queryString}`,
 				{
@@ -83,7 +80,7 @@ export default function useApiQuery<TData = any, TError = ApiError>(
 				...body,
 			} as TData;
 		},
-		// because of the usage of localstorage inside of the function we selectively disable the fetcher
+		// because of the usage of localstorage here selectively disable the fetcher
 		enabled: finalEnabled,
 	});
 }

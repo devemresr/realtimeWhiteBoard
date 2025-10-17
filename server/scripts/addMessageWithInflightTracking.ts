@@ -1,17 +1,13 @@
-export const addMessageWithInflightTracking = `
--- Add message to stream
-	local messageId = redis.call('XADD', unpack(ARGV))
-	
-	-- Create incremented key for HSET
-	local roomId = KEYS[1]
-	local roomKey = 'inFlight-' .. roomId
+// export const addMessageWithInflightTracking = `
+// 	local data = ARGV[1]
+// 	local xaddArgs = {}
+// 	for i = 2, #ARGV do
+//     	table.insert(xaddArgs, ARGV[i])
+//   	end
 
-	-- Store messageId in hash
-	local result = redis.call('SADD', roomKey, messageId)
-	
-	local resultObj = {
-		result = result,
-		messageId = messageId
-	}
-	
-	return cjson.encode(resultObj)`;
+// 	-- Add message to stream
+// 	local redisMessageId = redis.call('XADD', unpack(xaddArgs))
+
+// 	-- Store redisMessageId in hash
+
+// 	return {redisMessageId}`;

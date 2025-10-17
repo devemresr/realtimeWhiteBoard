@@ -45,13 +45,13 @@ const usePacketSending = (
 			if (!socket) return;
 
 			const packageSequenceNumber = packageNumber.current++;
-			const rooms = ['room1', 'room2', 'room3', 'room4'];
-			const randomIndex = Math.floor(Math.min(Math.random() * 10, 3));
-			const randomRoom = rooms[randomIndex];
+			// const rooms = ['room1', 'room2', 'room3', 'room4'];
+			// const randomIndex = Math.floor(Math.min(Math.random() * 10, 3));
+			// const randomRoom = rooms[randomIndex];
 
 			const strokeData: StrokeData = {
 				// roomId: randomRoom,
-				roomId: 'room1',
+				roomId: 'room2',
 				strokes,
 				strokeId: strokeId.current,
 				packageSequenceNumber,

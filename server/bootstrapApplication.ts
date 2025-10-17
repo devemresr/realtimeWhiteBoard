@@ -8,6 +8,7 @@ import { RedisFactory } from './services/redis/RedisFactory';
 import { RedisClient } from './services/redis/RedisClient';
 import RedisStreamManager from './services/RedisStreamManager';
 import { SocketManager } from './controllers/socketManager';
+import { REDIS_CLIENTS } from '../shared/constants/socketIoConstants';
 
 export async function bootstrapApplication(
 	serverReference: HttpServer,
@@ -34,9 +35,9 @@ export async function bootstrapApplication(
 			{
 				port: 6380,
 			},
-			'redisAdapterInstance' // the instance key the factory uses to keep track of redis instances
+			REDIS_CLIENTS.ADAPTER
 		);
-		redisAdapterInstance.on('error', (err) => console.error('cache', err));
+		redisAdapterInstance.on('error', (err) => console.error('adapter', err));
 		console.log('Redis Adapter initialized');
 
 		// initialize redis adapter
@@ -51,9 +52,9 @@ export async function bootstrapApplication(
 			{
 				port: 6379,
 			},
-			'redisMain' // the instance key the factory uses to keep track of redis instances
+			REDIS_CLIENTS.MAIN
 		);
-		redisMain.on('error', (err) => console.error('cache', err));
+		redisMain.on('error', (err) => console.error('redisMain', err));
 
 		// Initialize services
 		const tokenBucketManager = new TokenBucketManager(redisMain.getClient());

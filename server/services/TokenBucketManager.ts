@@ -18,7 +18,8 @@ class TokenBucketManager {
 		this.redis = redis;
 		this.tokenBuckets = new Map();
 		this.config = {
-			tokenCap: config?.tokenCap ?? 10000,
+			// todo set actual limits
+			tokenCap: config?.tokenCap ?? 1000000,
 			refillRate: config?.refillRate ?? 2000,
 			cost: config?.cost ?? 1000,
 			TTLforBuckets: config?.TTLforBuckets ?? 3600,
@@ -28,7 +29,6 @@ class TokenBucketManager {
 	// todo add a userId parameter currently using socketid to test
 	public getOrCreateBucket(socket: Socket): TokenBucket {
 		const userId = socket.data.userId || socket.id;
-		console.log('socket.id', socket.id);
 
 		if (!this.tokenBuckets.has(userId)) {
 			const bucket = new TokenBucket(

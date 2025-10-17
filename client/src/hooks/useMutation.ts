@@ -2,11 +2,12 @@
 
 import { useMutation } from '@tanstack/react-query';
 
-type HttpMethod = 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+type HttpMethod = 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'GET';
 
 type MutationConfig = {
 	method: HttpMethod;
 	url: string;
+	apiType?: string;
 };
 
 type ApiError = {
@@ -30,18 +31,17 @@ export default function useApiMutation<
 				typeof window !== 'undefined'
 					? localStorage.getItem('accessToken')
 					: null;
-			const response = await fetch(
-				`${process.env.NEXT_PUBLIC_DEV_SERVER_URL}${config.url}`,
-				{
-					method: config.method,
-					headers: {
-						...(accessToken && { Authorization: `Bearer ${accessToken}` }),
-						'Content-Type': 'application/json',
-					},
-					credentials: 'include',
-					body: JSON.stringify(variables),
-				}
-			);
+
+			const callUrl = config.apiType ?? process.env.NEXT_PUBLIC_DEV_SERVER_URL;
+			const response = await fetch(`${callUrl}${config.url}`, {
+				method: config.method,
+				headers: {
+					...(accessToken && { Authorization: `Bearer ${accessToken}` }),
+					'Content-Type': 'application/json',
+				},
+				credentials: 'include',
+				...(config.method !== 'GET' && { body: JSON.stringify(variables) }),
+			});
 
 			if (!response.ok) {
 				throw {
