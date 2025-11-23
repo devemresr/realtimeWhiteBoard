@@ -135,7 +135,7 @@ const whiteBoardApp = () => {
 
 	return (
 		<>
-			<div className='flex '>
+			{/* <div className='flex '>
 				<label className='flex items-center gap-2'>
 					email:
 					<input
@@ -202,7 +202,7 @@ const whiteBoardApp = () => {
 					fetch protected
 				</button>
 			</div>
-			{connected ? `connected with id: ${socketId}` : 'didnt connect '}
+			{connected ? `connected with id: ${socketId}` : 'didnt connect '} */}
 			<Canvas socket={socketRef.current} />
 		</>
 	);

@@ -7,6 +7,10 @@ import usePacketSending from '../hooks/usePacketSending';
 import useCanvasDrawing from '../hooks/useCanvasDrawing';
 import useSocketDrawing from '../hooks/useSocketDrawing';
 import { Point } from '../app/types_interfaces/DrawingTypes';
+import CanvasSideBar from './canvasSideBar/canvasSideBar';
+import { CanvasBarKeys, CanvasShapeKeys } from './types';
+import CanvasBar from './canvasBar';
+import Menu from './menu';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -14,8 +18,14 @@ interface ChildComponentProps {
 
 export default function Canvas({ socket }: ChildComponentProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const [selectedElement, setSelectedElement] = useState<CanvasBarKeys>('draw');
+	const [brushShape, setBrushShape] = useState<CanvasShapeKeys>('square');
+	const [textStyle, setTextStyle] = useState({
+		size: 'mediumT',
+		design: 'default',
+	});
 	const [isDrawing, setIsDrawing] = useState(false);
-	const [brushSize, setBrushSize] = useState(5);
+	const [brushSize, setBrushSize] = useState(8);
 	const [brushColor, setBrushColor] = useState('#000000');
 	const strokePointsRef = useRef([]);
 	const [strokePointsCount, setStrokePointsCount] = useState(0);
@@ -147,8 +157,8 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	}, []);
 
 	return (
-		<div className=''>
-			<div className='mb-4 flex gap-4 items-center flex-wrap'>
+		<div className=' flex relative'>
+			{/* <div className='mb-4 flex gap-4 items-center flex-wrap'>
 				<label className='flex items-center gap-2'>
 					Size:
 					<input
@@ -199,10 +209,26 @@ export default function Canvas({ socket }: ChildComponentProps) {
 					onChange={(e) => onInputChange(e.target.value, 'vertical')}
 				/>
 				<button onClick={resetInputs}>reset</button>
-			</div>
-
+			</div> */}
+			<Menu />
+			<CanvasBar
+				setSelectedElement={setSelectedElement}
+				selectedElement={selectedElement}
+				clearCanvas={clearCanvas}
+			/>
+			<CanvasSideBar
+				selectedElement={selectedElement}
+				brushColor={brushColor}
+				setBrushColor={setBrushColor}
+				brushSize={brushSize}
+				setBrushSize={setBrushSize}
+				brushShape={brushShape}
+				setBrushShape={setBrushShape}
+				textStyle={textStyle}
+				setTextStyle={setTextStyle}
+			/>
 			<canvas
-				title='canvas'
+				//title='canvas'
 				ref={canvasRef}
 				width={1800}
 				height={1000}
