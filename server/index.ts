@@ -14,8 +14,9 @@ import mongoose from 'mongoose';
 import helmet from 'helmet';
 import { handleSanitization } from './middleware/handleSanitization';
 import { bootstrapApplication } from './bootstrapApplication';
+import { cloneElement } from 'react';
 
-const PORT = process.argv[2] || 3000;
+const PORT = process.argv[2] || 3002;
 const app = express();
 const httpServer = createServer(app);
 
@@ -40,6 +41,7 @@ async function startServer() {
 
 		await mongoose.connect(mongoUri);
 		console.log('MongoDB connected');
+		// clearAllCollections();
 
 		console.log('Bootstrapping application...');
 		await bootstrapApplication(httpServer, PORT.toString());
@@ -51,11 +53,24 @@ async function startServer() {
 			});
 		});
 
-		console.log('Server strated successfully');
+		console.log('Server started successfully');
 	} catch (error) {
 		console.log('error during server startup:', error);
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 		process.exit(1);
+	}
+}
+
+async function clearAllCollections() {
+	const collections = await mongoose.connection.db.listCollections().toArray();
+	console.log('collections: ', collections);
+
+	for (const collectionInfo of collections) {
+		const collectionName = collectionInfo.name;
+		const collection = mongoose.connection.db.collection(collectionName);
+
+		await collection.deleteMany({});
+		console.log(`Cleared: ${collectionName}`);
 	}
 }
 

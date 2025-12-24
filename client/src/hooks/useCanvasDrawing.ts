@@ -2,89 +2,23 @@
 
 import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { Point } from '../app/types_interfaces/DrawingTypes';
+import createInterpolator from '../util/drawing/interpolation';
+import logger from '../util/logger';
+interface PackageSituation {
+	receivedPackageIds: Set<number>; // O(1) lookup instead of using an array
+	expectedPackageSequenceNumber: number;
+	highestPackageSequenceNumber: number;
+	missingPackageIds: Set<number>;
+	lastPackageSequenceNumber: number;
+}
 
 const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 	const requestRef = useRef(null);
-	const lastBroadcastPoint = useRef(null);
-	const MAXGAP = 5;
-	const SKIP_INTERPOLATION_THRESHOLD = 2;
 	const ctxRef = useRef(null);
 	const contextPropsRef = useRef({ brushColor: null, brushSize: null });
-
-	// Memoize the interpolation function to avoid recreation
-	const smartInterpolation = useMemo(() => {
-		return (points: Point[], maxGap: number) => {
-			if (points.length < 2) return points;
-
-			const result = [points[0]];
-
-			for (let i = 1; i < points.length; i++) {
-				const prev = points[i - 1];
-				const currentPoint = points[i];
-				const distance = Math.sqrt(
-					(currentPoint.x - prev.x) ** 2 + (currentPoint.y - prev.y) ** 2
-				);
-
-				if (distance <= maxGap) {
-					result.push(currentPoint);
-					continue;
-				}
-
-				// For only large gaps use interpolation
-				const numInterpolated = Math.ceil(distance / maxGap);
-
-				// Determine curve direction from context
-				let controlOffset = { x: 0, y: 0 };
-
-				if (i >= 2) {
-					const prevPrev = points[i - 2];
-					const direction = {
-						x: prev.x - prevPrev.x,
-						y: prev.y - prevPrev.y,
-					};
-					controlOffset = {
-						x: direction.x * 0.3,
-						y: direction.y * 0.3,
-					};
-				} else if (i < points.length - 1) {
-					const next = points[i + 1];
-					const direction = {
-						x: next.x - currentPoint.x,
-						y: next.y - currentPoint.y,
-					};
-					controlOffset = {
-						x: -direction.x * 0.3,
-						y: -direction.y * 0.3,
-					};
-				}
-
-				// Generate smooth interpolated points using quadratic curve
-				for (let j = 1; j <= numInterpolated; j++) {
-					const t = j / numInterpolated;
-
-					const controlPoint = {
-						x: (prev.x + currentPoint.x) / 2 + controlOffset.x,
-						y: (prev.y + currentPoint.y) / 2 + controlOffset.y,
-					};
-
-					const interpolatedPoint = {
-						x:
-							(1 - t) * (1 - t) * prev.x +
-							2 * (1 - t) * t * controlPoint.x +
-							t * t * currentPoint.x,
-						y:
-							(1 - t) * (1 - t) * prev.y +
-							2 * (1 - t) * t * controlPoint.y +
-							t * t * currentPoint.y,
-					};
-
-					result.push(interpolatedPoint);
-				}
-			}
-
-			return result;
-		};
-	}, []);
+	const interpolator = createInterpolator({
+		maxGap: 5, // max pixels till no interpolation
+	});
 
 	const setupContext = useCallback(() => {
 		if (canvasRef.current && !ctxRef.current) {
@@ -128,84 +62,58 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 		[brushSize, brushColor, updateContextProps]
 	);
 
-	const drawPathOnCanvas = useCallback(
-		(points: Point[]) => {
-			if (!ctxRef.current) return;
+	const drawIncrementalPath = useCallback(
+		(contextPoints: Point[], toBeDrawnPoints: Point[]) => {
+			if (!ctxRef.current || toBeDrawnPoints.length === 0) return;
 
-			if (points.length <= SKIP_INTERPOLATION_THRESHOLD) {
-				// todo decide what to do with exactly 2 points currently
-				drawDotOnCanvas(points[0]);
+			const ctx = ctxRef.current;
+			updateContextProps();
+
+			if (toBeDrawnPoints.length === 1) {
+				drawDotOnCanvas(toBeDrawnPoints[0]);
 				return;
 			}
 
-			const ctx = ctxRef.current;
-			// Update context properties only if changed // todo search if this is possible with usecontext
-			updateContextProps();
+			logger.debug(
+				'received interpolation: contextPoints: ',
+				JSON.stringify(contextPoints),
+				'received interpolation segment: ',
+				JSON.stringify(toBeDrawnPoints)
+			);
+			logger.debug(
+				'before interpolation',
+				JSON.stringify([...contextPoints, ...toBeDrawnPoints], null, 2)
+			);
+			const interpolated = interpolator.interpolate([
+				...contextPoints,
+				...toBeDrawnPoints,
+			]);
+			logger.debug(
+				`after interpolation:`,
+				JSON.stringify(interpolated, null, 2)
+			);
 
-			const skipInterpolation: boolean =
-				points.length < SKIP_INTERPOLATION_THRESHOLD ? true : false;
-			const finalPoints = skipInterpolation
-				? points
-				: smartInterpolation(points, MAXGAP);
+			let startIndex = 0;
+
+			if (startIndex >= interpolated.length) {
+				console.log('Nothing new to draw after skip');
+				return;
+			}
 
 			ctx.beginPath();
-			ctx.moveTo(finalPoints[0].x, finalPoints[0].y);
+			ctx.moveTo(interpolated[startIndex].x, interpolated[startIndex].y);
 
-			for (let i = 1; i < finalPoints.length - 1; i++) {
-				const current = finalPoints[i];
-				const next = finalPoints[i + 1];
-				const controlX = (current.x + next.x) / 2;
-				const controlY = (current.y + next.y) / 2;
-				ctx.quadraticCurveTo(current.x, current.y, controlX, controlY);
+			for (let i = startIndex + 1; i < interpolated.length; i++) {
+				ctx.lineTo(interpolated[i].x, interpolated[i].y);
 			}
 
+			console.log(`Drew ${interpolated.length - startIndex} points`);
 			ctx.stroke();
 		},
-		[smartInterpolation, updateContextProps]
+		[interpolator, updateContextProps, drawDotOnCanvas]
 	);
 
-	const drawBroadcastPath = useCallback(
-		(points: Point[], isFirstPackage: boolean, isLastPackage: boolean) => {
-			if (points?.length === 0) return;
-
-			const standalonePackage = isFirstPackage && isLastPackage;
-			let drawPoints: Point[];
-
-			if (isFirstPackage && !standalonePackage) {
-				drawPoints = points;
-				lastBroadcastPoint.current = points[points.length - 1];
-			} else if (standalonePackage) {
-				drawPoints = points;
-				lastBroadcastPoint.current = null;
-			} else if (isLastPackage) {
-				if (lastBroadcastPoint.current) {
-					const firstPoint = points[0];
-					const lastPoint = lastBroadcastPoint.current;
-					const distance = Math.sqrt(
-						(firstPoint.x - lastPoint.x) ** 2 +
-							(firstPoint.y - lastPoint.y) ** 2
-					);
-
-					if (distance < 1) {
-						drawPoints = [lastBroadcastPoint.current, ...points.slice(1)];
-					} else {
-						drawPoints = [lastBroadcastPoint.current, ...points];
-					}
-				} else {
-					drawPoints = points;
-				}
-				lastBroadcastPoint.current = null;
-			} else {
-				drawPoints = lastBroadcastPoint.current
-					? [lastBroadcastPoint.current, ...points]
-					: points;
-				lastBroadcastPoint.current = points[points.length - 1];
-			}
-			drawPathOnCanvas(drawPoints);
-		},
-		[drawPathOnCanvas]
-	);
-
+	// todo make an api call to server to flag everything as deleteddrawBroadcastPath,
 	const clearCanvas = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (canvas) {
@@ -214,6 +122,7 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 		}
 	}, []);
 
+	// cleanup for rAF
 	useEffect(() => {
 		return () => {
 			if (requestRef.current) {
@@ -224,10 +133,9 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 
 	return {
 		requestRef,
-		drawPathOnCanvas,
-		drawBroadcastPath,
 		clearCanvas,
 		drawDotOnCanvas,
+		drawIncrementalPath,
 	};
 };
 

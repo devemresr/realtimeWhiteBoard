@@ -56,6 +56,9 @@ export async function bootstrapApplication(
 		);
 		redisMain.on('error', (err) => console.error('redisMain', err));
 
+		// await redisAdapterInstance.getClient().flushall();
+		// await redisMain.getClient().flushall();
+
 		// Initialize services
 		const tokenBucketManager = new TokenBucketManager(redisMain.getClient());
 		const redisStreamManager = new RedisStreamManager(redisMain.getClient());

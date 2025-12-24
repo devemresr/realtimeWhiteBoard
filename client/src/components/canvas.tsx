@@ -2,7 +2,6 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
-import DrawingAnalytics from '../util/DrawingAnalytics';
 import usePacketSending from '../hooks/usePacketSending';
 import useCanvasDrawing from '../hooks/useCanvasDrawing';
 import useSocketDrawing from '../hooks/useSocketDrawing';
@@ -11,6 +10,10 @@ import CanvasSideBar from './canvasSideBar/canvasSideBar';
 import { CanvasBarKeys, CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
 import Menu from './menu';
+import { useGetOnboardingData } from '../hooks/useFormPosts';
+import useMouseLog from '../hooks/useMouseLog';
+import logger from '../util/logger';
+import { useBroadcastPath } from '../util/drawing/useBroadcastPath';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -18,6 +21,7 @@ interface ChildComponentProps {
 
 export default function Canvas({ socket }: ChildComponentProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const lastDrawnIndexRef = useRef(0);
 	const [selectedElement, setSelectedElement] = useState<CanvasBarKeys>('draw');
 	const [brushShape, setBrushShape] = useState<CanvasShapeKeys>('square');
 	const [textStyle, setTextStyle] = useState({
@@ -28,35 +32,65 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const [brushSize, setBrushSize] = useState(8);
 	const [brushColor, setBrushColor] = useState('#000000');
 	const strokePointsRef = useRef([]);
-	const [strokePointsCount, setStrokePointsCount] = useState(0);
 
-	const {
-		requestRef,
-		drawPathOnCanvas,
-		drawBroadcastPath,
-		clearCanvas,
-		drawDotOnCanvas,
-	} = useCanvasDrawing(canvasRef, brushColor, brushSize);
+	const { requestRef, clearCanvas, drawDotOnCanvas, drawIncrementalPath } =
+		useCanvasDrawing(canvasRef, brushColor, brushSize);
+
+	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
+		useMouseLog();
 
 	const getBoardingData = useGetOnboardingData('http://localhost:3010');
 	async function getOnboardingData(e) {
 		e.preventDefault();
 		getBoardingData.mutate(null, {
 			onSuccess: (data: any) => {
-				data.data
-					.flatMap((i) => i)
-					.forEach((element) => {
-						const msg = element.data;
-						const isFirstPackage = msg.packageSequenceNumber === 1;
-						const isLastPackage = msg.isLastPackage;
-						drawBroadcastPath(msg.strokes, isFirstPackage, isLastPackage);
+				console.log('get getOnboardingData: ', data);
+
+				const allStrokes = data.data;
+				const seen = new Set();
+				const duplicatePackages = [];
+
+				const deduped = allStrokes.map((packages) =>
+					packages.filter((item) => {
+						if (seen.has(item.packageId)) {
+							duplicatePackages.push(item);
+							return false;
+						}
+						seen.add(item.packageId);
+						return true;
+					})
+				);
+
+				logger.debug({ deduped, duplicatePackages, seen });
+
+				deduped.forEach((element) => {
+					element.forEach((i) => {
+						logger.debug(
+							{ package: i, strokes: i.strokes, packageId: i.packageId, i },
+							'deduped package'
+						);
+						const isFirstPackage = i?.packageSequenceNumber;
+						const isLastPackage = i?.isLastPackage;
+						drawBroadcastPath(
+							i.strokes ?? [],
+							isFirstPackage,
+							isLastPackage,
+							i.packageId,
+							i.strokeId,
+							i.packageSequenceNumber
+						);
 					});
+				});
 			},
 			onError: (err) => {
 				console.error('Failed:', err);
 			},
 		});
 	}
+	const { drawBroadcastPath } = useBroadcastPath(
+		drawIncrementalPath,
+		drawDotOnCanvas
+	);
 
 	const { analytics } = useSocketDrawing(socket, drawBroadcastPath);
 	const {
@@ -72,57 +106,84 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	} = usePacketSending(socket, analytics);
 
 	const startDrawing = useCallback(
-		(e: React.MouseEvent<HTMLCanvasElement>) => {
+		(e: React.PointerEvent<HTMLCanvasElement>) => {
 			const { offsetX, offsetY } = e.nativeEvent;
 
 			const pos: Point = { x: offsetX, y: offsetY, timestamp: Date.now() };
 			strokePointsRef.current = [pos];
-			setStrokePointsCount(1);
 			setIsDrawing(true);
 			packageNumber.current = 1;
 
 			pointsBuffer.current = [pos];
 			strokeId.current = generateStrokeId();
 
-			// Draw initial dot
 			drawDotOnCanvas(pos);
 		},
 		[brushSize, brushColor, generateStrokeId]
 	);
 
 	const draw = useCallback(
-		(e: React.MouseEvent<HTMLCanvasElement>) => {
-			if (!isDrawing) return;
+		(e: React.PointerEvent<HTMLCanvasElement>) => {
+			if (!isDrawing) {
+				return;
+			}
 
-			const { offsetX, offsetY } = e.nativeEvent;
-			const currentPos = { x: offsetX, y: offsetY, timestamp: Date.now() };
+			const nativeEvent = e.nativeEvent as any;
+			const events = nativeEvent.getCoalescedEvents?.() || [e.nativeEvent];
 
-			// Update ref directly to avoid re-renders
-			strokePointsRef.current.push(currentPos);
-			setStrokePointsCount(strokePointsRef.current.length);
+			for (const event of events) {
+				const { offsetX, offsetY } = event;
+				const pos: Point = { x: offsetX, y: offsetY, timestamp: Date.now() };
+				strokePointsRef.current.push(pos);
+				pointsBuffer.current.push(pos);
+			}
 
-			pointsBuffer.current.push(currentPos);
 			handlePackageSending();
 
 			if (requestRef.current) {
 				cancelAnimationFrame(requestRef.current);
 			}
+
 			requestRef.current = requestAnimationFrame(() => {
-				drawPathOnCanvas(strokePointsRef.current);
+				console.debug('rAF executing...');
+				const lastDrawnIndex = lastDrawnIndexRef.current;
+				const totalPoints = strokePointsRef.current.length;
+
+				if (totalPoints <= lastDrawnIndex) {
+					requestRef.current = null;
+					return;
+				}
+
+				const contextStart = Math.max(Math.max(0, lastDrawnIndex - 2) - 1, 0);
+				logger.debug(
+					'the segment',
+					strokePointsRef.current.slice(contextStart, totalPoints + 1),
+					'lastDrawnIndex',
+					lastDrawnIndex
+				);
+
+				const segment = strokePointsRef.current.slice(
+					contextStart,
+					totalPoints + 1
+				);
+				const oldPointsCount = lastDrawnIndex - contextStart;
+
+				console.debug(
+					`Drawing: total=${totalPoints}, new=${totalPoints - lastDrawnIndex}, ` +
+						`segment=${segment.length}, context=${oldPointsCount},  contextStart=${contextStart}`
+				);
+
+				logger.debug(strokePointsRef.current, 'strokePointsRef');
+				// drawIncrementalPath(segment, oldPointsCount);
+				lastDrawnIndexRef.current = totalPoints;
+				requestRef.current = null;
 			});
 		},
-		[isDrawing, handlePackageSending, requestRef]
+		[isDrawing, handlePackageSending]
 	);
 
 	const stopDrawing = useCallback(() => {
 		if (!isDrawing) return;
-
-		// Final smooth render of the complete stroke
-		if (strokePointsRef.current.length > 1) {
-			if (requestRef.current) {
-				cancelAnimationFrame(requestRef.current);
-			}
-		}
 
 		if (incompletePacketTimeout.current) {
 			clearIncompletePacketTimeout();
@@ -147,7 +208,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 
 		setIsDrawing(false);
 		strokePointsRef.current = [];
-		setStrokePointsCount(0);
+		lastDrawnIndexRef.current = 0;
 
 		if (requestRef.current) {
 			cancelAnimationFrame(requestRef.current);
@@ -160,81 +221,15 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		strokeNumber,
 	]);
 
-	const [inputInfo, setInputInfo] = useState({
-		horizontal: 10,
-		vertical: 0,
-	});
-
-	const onInputChange = useCallback((value, fieldName) => {
-		setInputInfo((prev) => ({
-			...prev,
-			[fieldName]: Number(value),
-		}));
-	}, []);
-
-	const resetInputs = useCallback(() => {
-		setInputInfo({ horizontal: 10, vertical: 0 });
-	}, []);
-
 	return (
 		<div className=' flex relative'>
-			{/* <div className='mb-4 flex gap-4 items-center flex-wrap'>
-				<label className='flex items-center gap-2'>
-					Size:
-					<input
-						type='range'
-						min='1'
-						max='50'
-						value={brushSize}
-						onChange={(e) => setBrushSize(+e.target.value)}
-						className='w-20 '
-					/>
-					<span>{brushSize}px</span>
-				</label>
-
-				<label className='flex items-center gap-2'>
-					Color:
-					<input
-						type='color'
-						value={brushColor}
-						onChange={(e) => setBrushColor(e.target.value)}
-					/>
-				</label>
-
-				<button
-					onClick={clearCanvas}
-					className='px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600'
-				>
-					Clear
-				</button>
-
-				<div className='text-sm text-gray-600'>
-					Points in current stroke: {strokePointsCount}
-				</div>
-			</div>
-
-			<div className='flex justify-center gap-2'>
-				<input
-					placeholder='enter px in horizontal'
-					name='horizontal'
-					value={inputInfo.horizontal}
-					className='max-w-fit absolute z-30 left-0 '
-					onChange={(e) => onInputChange(e.target.value, 'horizontal')}
-				/>
-				<input
-					placeholder='enter px in vertical'
-					name='vertical'
-					value={inputInfo.vertical}
-					className='max-w-fit absolute z-30 left-80'
-					onChange={(e) => onInputChange(e.target.value, 'vertical')}
-				/>
-				<button onClick={resetInputs}>reset</button>
-			</div> */}
 			<Menu />
 			<CanvasBar
 				setSelectedElement={setSelectedElement}
 				selectedElement={selectedElement}
 				clearCanvas={clearCanvas}
+				isLogging={isLogging}
+				setIsLogging={setIsLogging}
 			/>
 			<CanvasSideBar
 				selectedElement={selectedElement}
@@ -248,16 +243,38 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				setTextStyle={setTextStyle}
 			/>
 			<canvas
-				//title='canvas'
+				title='canvas'
 				ref={canvasRef}
 				width={1800}
 				height={1000}
-				onMouseDown={startDrawing}
-				onMouseMove={draw}
-				onMouseUp={stopDrawing}
-				onMouseLeave={stopDrawing}
+				onPointerDown={startDrawing}
+				onPointerMove={(e) => {
+					draw(e);
+					updateMousePosition(e);
+				}}
+				onPointerUp={stopDrawing}
+				onPointerLeave={stopDrawing}
+				style={{ touchAction: 'none' }} // prevents default touch behaviors
 				className='cursor-crosshair border border-gray-300'
 			/>
+			<button onClick={getOnboardingData}> get getOnboardingData</button>
+
+			{isLogging && (
+				<div
+					style={{
+						position: 'fixed',
+						left: mousePos.x,
+						top: mousePos.y,
+						background: 'black',
+						color: 'white',
+						padding: '4px 8px',
+						borderRadius: '4px',
+						pointerEvents: 'none',
+					}}
+				>
+					x: {mousePos.x}, y: {mousePos.y}
+				</div>
+			)}
 		</div>
 	);
 }

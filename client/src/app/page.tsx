@@ -135,74 +135,10 @@ const whiteBoardApp = () => {
 
 	return (
 		<>
-			{/* <div className='flex '>
-				<label className='flex items-center gap-2'>
-					email:
-					<input
-						type='text'
-						name='email'
-						min='1'
-						max='50'
-						value={inputFields.email}
-						onChange={handleChange}
-						className='w-20'
-					/>
-				</label>
-				<label className='flex items-center gap-2'>
-					password:
-					<input
-						type='text'
-						name='password'
-						min='1'
-						max='50'
-						value={inputFields.password}
-						onChange={handleChange}
-						className='w-20'
-					/>
-				</label>
-				<button
-					className='bg-red-400 px-2'
-					onClick={handleRegister}
-					disabled={registerUser.isPending}
-				>
-					send
-				</button>
-				<label className='flex items-center gap-2'>
-					email:
-					<input
-						type='text'
-						name='email'
-						min='1'
-						max='50'
-						value={inputFieldsForLogin.email}
-						onChange={handleChangeForLogin}
-						className='w-20'
-					/>
-				</label>
-				<label className='flex items-center gap-2'>
-					password:
-					<input
-						type='text'
-						name='password'
-						min='1'
-						max='50'
-						value={inputFieldsForLogin.password}
-						onChange={handleChangeForLogin}
-						className='w-20'
-					/>
-				</label>
-				<button
-					className='bg-red-400 px-2'
-					onClick={handleLogin}
-					disabled={registerUser.isPending}
-				>
-					send
-				</button>
-				<button className='bg-red-400 px-2 ml-6' onClick={testfunc}>
-					fetch protected
-				</button>
+			<div title='isConnected'>
+				{connected ? `connected with id: ${socketId}` : 'didnt connect '}
 			</div>
-			{connected ? `connected with id: ${socketId}` : 'didnt connect '} */}
+
 			<Canvas socket={socketRef.current} />
 		</>
 	);

@@ -3,8 +3,9 @@
 import { useRef, useEffect } from 'react';
 import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
 import DrawingAnalytics from '../util/DrawingAnalytics';
+import logger from '../util/logger';
 
-const useSocketDrawing = (socket, drawBroadcastPath) => {
+const useSocketDrawing = (socket, drawBroadcastPath: Function) => {
 	const analytics = useRef(null);
 
 	useEffect(() => {
@@ -15,10 +16,22 @@ const useSocketDrawing = (socket, drawBroadcastPath) => {
 		analytics.current.startRealtimeMonitoring(2000);
 
 		const handleDrawingPacket = (data) => {
-			console.log('RECEIVED_DATA: ', data);
+			logger.debug('Received broadcasted data: ', data);
 			const isFirstPackage = data.packageSequenceNumber === 1;
 			const isLastPackage = data.isLastPackage;
-			drawBroadcastPath(data.strokes, isFirstPackage, isLastPackage);
+			console.log(
+				'lastPackage Received for stroke: ',
+				data.strokeSequenceNumber
+			);
+
+			drawBroadcastPath(
+				data.strokes,
+				isFirstPackage,
+				isLastPackage,
+				data.packageId,
+				data.strokeId,
+				data.packageSequenceNumber
+			);
 		};
 
 		socket.on(

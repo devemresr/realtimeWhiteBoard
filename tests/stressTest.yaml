@@ -1,0 +1,172 @@
+# artillery-socketio-test.yml
+config:
+  target: 'http://localhost:8080'
+  phases:
+    # Warm-up phase
+    - duration: 5
+      arrivalRate: 5
+      name: 'Warm-up'
+
+    # Main load test
+    - duration: 30
+      arrivalRate: 50
+      name: 'Main load test'
+
+    # Peak load test
+    - duration: 10
+      arrivalRate: 100
+      name: 'Peak load test'
+
+  # Socket.IO specific configuration
+  socketio:
+    # Increase timeout if your server needs more time to respond
+    timeout: 10000
+    # Enable reconnection for more realistic testing
+    reconnection: true
+    reconnectionAttempts: 3
+    reconnectionDelay: 1000
+
+  defaults:
+    headers:
+      Connection: 'keep-alive'
+      User-Agent: 'Artillery-Test-{{ $uuid }}'
+
+scenarios:
+  - name: 'Socket.IO Drawing Test with Room Join'
+    engine: socketio
+    flow:
+      # Wait for connection event
+      # - think: 0.5
+
+      # Join room first (like your client does)
+      - emit:
+          channel: 'join-room'
+          data: 'test'
+          acknowledge:
+            match:
+              value: true
+            timeout: 5000
+
+      # # Wait a bit before starting to draw
+      # - think: 1
+
+      # Send multiple drawing packets to simulate real drawing
+      - loop:
+          - emit:
+              channel: 'drawing-packet'
+              data:
+                strokes:
+                  [
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                  ]
+                strokeSequenceNumber: '{{ $loopCount }}'
+                strokeId: '{{ $uuid }}'
+                packageSequenceNumber: '{{ $loopCount }}'
+                isLastPackage: false
+                roomId: 'test'
+              acknowledge:
+                # You can check the ack response structure
+                match:
+                  json: '$.success'
+                  value: true
+                timeout: 5000
+
+          # Small delay between drawing packets (realistic user behavior)
+          - think: 0.1
+        count: 10
+
+      # Send final packet
+      - emit:
+          channel: 'drawing-packet'
+          data:
+            strokes:
+              [
+                {
+                  x: '{{ $randomNumber(100, 900) }}',
+                  y: '{{ $randomNumber(50, 500) }}',
+                  timestamp: '{{ $timestamp }}',
+                },
+              ]
+            strokeSequenceNumber: 11
+            strokeId: '{{ $uuid }}'
+            packageSequenceNumber: 11
+            isLastPackage: true
+            roomId: 'test'
+          acknowledge:
+            timeout: 5000
+
+      # Keep connection alive for a bit to test sustained connections
+      - think: 5
+
+  # Optional: Test connection/disconnection patterns
+  # - name: 'Rapid Connect/Disconnect Test'
+  #   weight: 10
+  #   engine: socketio
+  #   flow:
+  #     - emit:
+  #         channel: 'join-room'
+  #         data: 'test'
+  #         acknowledge:
+  #           timeout: 3000
+
+  #     - think: 2
+
+  #     # Artillery automatically disconnects at the end of the scenario
+  #     # This tests connection churn
+
+  # Optional: Test different room patterns
+  # - name: 'Multi-Room Drawing Test'
+  #   weight: 30
+  #   engine: socketio
+  #   flow:
+  #     - emit:
+  #         channel: 'join-room'
+  #         data: 'room-{{ $randomNumber(1, 5) }}'
+  #         acknowledge:
+  #           timeout: 5000
+
+  #     - loop:
+  #         - emit:
+  #             channel: 'drawing-packet'
+  #             data:
+  #               strokes:
+  #                 [
+  #                   {
+  #                     x: '{{ $randomNumber(100, 900) }}',
+  #                     y: '{{ $randomNumber(50, 500) }}',
+  #                     timestamp: '{{ $timestamp }}',
+  #                   },
+  #                 ]
+  #               strokeSequenceNumber: '{{ $loopCount }}'
+  #               strokeId: '{{ $uuid }}'
+  #               packageSequenceNumber: '{{ $loopCount }}'
+  #               isLastPackage: true
+  #               roomId: 'room-{{ $randomNumber(1, 5) }}'
+  #             acknowledge:
+  #               timeout: 5000
+  #         - think: 0.2
+  #       count: 5

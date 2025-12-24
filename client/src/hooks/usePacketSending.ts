@@ -5,12 +5,13 @@ import { Socket } from 'socket.io-client';
 import { Point, StrokeData } from '../app/types_interfaces/DrawingTypes';
 import DrawingAnalytics from '../util/DrawingAnalytics';
 import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
+import { v4 as uuidv4 } from 'uuid';
 
 const usePacketSending = (
 	socket: Socket | null,
 	analytics: React.MutableRefObject<DrawingAnalytics | null>
 ) => {
-	const POINTS_PER_PACKET = 10;
+	const POINTS_PER_PACKET = 2; // for catmull we need for 4 points at max and context gets provided by previous packages
 	const INCOMPLETE_PACKAGE_TIMEOUT = 500;
 	const pointsBuffer = useRef<Point[]>([]);
 	const retryBuffer = useRef<StrokeData[]>([]);
@@ -20,7 +21,7 @@ const usePacketSending = (
 	const strokeId = useRef<string>('');
 
 	const generateStrokeId = useCallback(() => {
-		return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+		return Date.now().toString() + uuidv4().toString(); // maybe instead of having meaningless ids migration to meaningfull ones makes more sense
 	}, []);
 
 	const clearIncompletePacketTimeout = useCallback(() => {
@@ -40,8 +41,6 @@ const usePacketSending = (
 			strokeSequenceNumber?: number;
 			isLastPackage?: boolean;
 		}) => {
-			console.log('sendpacket');
-
 			if (!socket) return;
 
 			const packageSequenceNumber = packageNumber.current++;
@@ -104,7 +103,10 @@ const usePacketSending = (
 			for (let i = 0; i < packageThreshold; i++) {
 				const strokes = pointsBuffer.current.splice(0, POINTS_PER_PACKET);
 				const strokeSequenceNumber = strokeNumber.current;
+				console.log('pointsBuffer before sendPackage: ', pointsBuffer.current);
+
 				sendPackage({ strokes, strokeSequenceNumber });
+				console.log('pointsBuffer after sendPackage: ', pointsBuffer.current);
 			}
 		} else {
 			// Set timeout for remaining incomplete packet (if any)

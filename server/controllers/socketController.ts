@@ -125,12 +125,33 @@ class SocketController {
 			const originalSocketId = socket.id;
 			console.log('originalSocketId', originalSocketId);
 
-			this.io
-				.to(roomId)
-				.except(originalSocketId)
-				.emit(SOCKET_EVENTS.BROADCASTING_DRAWING_DATA, {
-					...redisMessage,
-				});
+			let delay = Math.random() * 1000;
+			const randomlyDelayMore = Math.random() > 0.5;
+			delay = randomlyDelayMore ? Math.random() * 10000 : delay;
+			const delayOrNot = Math.random() > 0.5;
+			setTimeout(
+				() => {
+					console.log(
+						'sending delayed package',
+						delay,
+						delayOrNot,
+						randomlyDelayMore
+					);
+					this.io
+						.to(roomId)
+						.except(originalSocketId)
+						.emit(SOCKET_EVENTS.BROADCASTING_DRAWING_DATA, {
+							...redisMessage,
+						});
+				},
+				delayOrNot ? delay : 1
+			);
+			// this.io
+			// 	.to(roomId)
+			// 	.except(originalSocketId)
+			// 	.emit(SOCKET_EVENTS.BROADCASTING_DRAWING_DATA, {
+			// 		...redisMessage,
+			// 	});
 		} catch (error) {
 			console.error(
 				`Error in broadcasting to the room ${roomId ?? 'unknown'}:`,

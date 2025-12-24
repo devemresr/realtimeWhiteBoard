@@ -10,10 +10,9 @@ import { DrawingPatternMocker } from './utility/DrawingPatternMocker';
 export async function mockDrawingSession(page: Page): Promise<void> {
 	const mocker = new DrawingPatternMocker(page, '#drawing-canvas');
 	await mocker.init();
-
+	console.log('mockDrawingSession init');
 	await mocker.drawStickFigure();
 	await mocker.drawSimpleFlower();
-	await page.waitForTimeout(3000);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -21,17 +20,23 @@ test.beforeEach(async ({ page }) => {
 
 	// Wait for the page to be ready (optional but recommended)
 	await page.waitForLoadState('networkidle');
+	await expect(page.getByTitle('isConnected')).not.toContainText(
+		'didnt connect'
+	);
 });
 
-test('random drawings', async ({ page, browser }) => {
-	for (let i = 0; i < 3; i++) {
-		for (let a = 0; a < 4; a++) {
+let index = 0;
+const pages: Page[] = [];
+// todo
+test('random drawings', async ({ browser }) => {
+	for (let i = 0; i < 1; i++) {
+		for (let a = 0; a < 2; a++) {
+			const windowPositionsX = a * 400;
 			const windowPositionsY = i * 300;
-			const windowPositionsX = a * 300;
 			const windowPosition = `${windowPositionsX},${windowPositionsY}`;
 			const browser2 = await chromium.launch({
 				headless: false,
-				args: [`--window-position=${windowPosition}`, '--window-size=300,300'],
+				args: [`--window-position=${windowPosition}`, '--window-size=400,300'],
 			});
 			const context = await browser2.newContext({
 				viewport: { width: 400, height: 300 },
@@ -41,11 +46,21 @@ test('random drawings', async ({ page, browser }) => {
 			await page.evaluate(() => {
 				window.scrollBy(0, 160);
 			});
-			if (i == 2 && a === 3) {
-				await page.waitForTimeout(10000000); // Wait 10 seconds
-			}
-		}
+			index++;
 
-		// await context.close();
+			pages.push(page);
+		}
 	}
+	// execute drawing on all pages simultaneously after adding indexes well get simultanous stickman drawings side to side to test concurrent drawing
+	await Promise.all(pages.map((p) => mockDrawingSession(p)));
+
+	console.log('All drawings completed');
+});
+
+//
+test.afterEach(async ({ page }) => {
+	await mockDrawingSession(page);
+	console.log('index at afterEach: ', index);
+
+	await page.waitForTimeout(100000);
 });

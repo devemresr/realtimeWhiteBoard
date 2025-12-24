@@ -9,7 +9,7 @@ type StrokeData = {
 	strokeId: string;
 	packageSequenceNumber: number;
 	isLastPackage?: boolean;
-	strokeSequenceNumber?: number;
+	strokeSequenceNumber: number;
 	packageId: string;
 };
 export type { Point, StrokeData };

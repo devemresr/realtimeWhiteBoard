@@ -127,7 +127,6 @@ export class DrawingPatternMocker {
 			centerX + legSpread,
 			bodyBottom + legLength
 		);
-		console.log('stickman ended for: ', this.page);
 	}
 
 	// Mock drawing a flower with typical child-like proportions
