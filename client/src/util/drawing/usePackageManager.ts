@@ -1,4 +1,3 @@
-// hooks/usePackageManager.ts
 import { Point } from '../../app/types_interfaces/DrawingTypes';
 import logger from '../logger';
 import { useCallback, useRef } from 'react';
@@ -8,7 +7,7 @@ interface PackageSituation {
 	expectedPackageSequenceNumber: number;
 	highestPackageSequenceNumber: number;
 	missingPackageIds: Set<number>;
-	permanentGaps: Set<number>; // NEW: Track permanent gaps
+	permanentGaps: Set<number>; // Track permanent gaps
 	lastPackageSequenceNumber: number | null;
 	lastRenderedSequence: number;
 	holdRendering: boolean;
@@ -35,7 +34,7 @@ export const usePackageManager = () => {
 					receivedPackageIds: new Set<number>(),
 					expectedPackageSequenceNumber: 1,
 					missingPackageIds: new Set<number>(),
-					permanentGaps: new Set<number>(), // NEW
+					permanentGaps: new Set<number>(),
 					highestPackageSequenceNumber: 0,
 					lastPackageSequenceNumber: isLastPackage
 						? packageSequenceNumber
@@ -101,18 +100,18 @@ export const usePackageManager = () => {
 				return false;
 			}
 
-			const complete =
+			const isComplete =
 				situation.receivedPackageIds.size ===
 				situation.lastPackageSequenceNumber;
 
-			if (complete) {
-				logger.debug('Stroke completed', {
+			if (isComplete) {
+				logger.debug('Stroke is completed', {
 					totalPackages: situation.lastPackageSequenceNumber,
 					receivedPackages: situation.receivedPackageIds.size,
 				});
 			}
 
-			return complete;
+			return isComplete;
 		},
 		[]
 	);

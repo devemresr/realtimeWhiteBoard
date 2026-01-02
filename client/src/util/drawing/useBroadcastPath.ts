@@ -268,7 +268,7 @@ export const useBroadcastPath = (
 				}
 
 				// Check completion
-				packageManager.isStrokeComplete(situation);
+				const isComplete = packageManager.isStrokeComplete(situation);
 
 				// Save updated situation
 				packageManager.packageSituations.current.set(strokeId, situation);

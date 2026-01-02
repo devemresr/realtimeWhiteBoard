@@ -14,6 +14,7 @@ import { useGetOnboardingData } from '../hooks/useFormPosts';
 import useMouseLog from '../hooks/useMouseLog';
 import logger from '../util/logger';
 import { useBroadcastPath } from '../util/drawing/useBroadcastPath';
+import { useOnboardingData } from '../hooks/useOnboardingData';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -39,54 +40,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
 		useMouseLog();
 
-	const getBoardingData = useGetOnboardingData('http://localhost:3010');
-	async function getOnboardingData(e) {
-		e.preventDefault();
-		getBoardingData.mutate(null, {
-			onSuccess: (data: any) => {
-				console.log('get getOnboardingData: ', data);
-
-				const allStrokes = data.data;
-				const seen = new Set();
-				const duplicatePackages = [];
-
-				const deduped = allStrokes.map((packages) =>
-					packages.filter((item) => {
-						if (seen.has(item.packageId)) {
-							duplicatePackages.push(item);
-							return false;
-						}
-						seen.add(item.packageId);
-						return true;
-					})
-				);
-
-				logger.debug({ deduped, duplicatePackages, seen });
-
-				deduped.forEach((element) => {
-					element.forEach((i) => {
-						logger.debug(
-							{ package: i, strokes: i.strokes, packageId: i.packageId, i },
-							'deduped package'
-						);
-						const isFirstPackage = i?.packageSequenceNumber;
-						const isLastPackage = i?.isLastPackage;
-						drawBroadcastPath(
-							i.strokes ?? [],
-							isFirstPackage,
-							isLastPackage,
-							i.packageId,
-							i.strokeId,
-							i.packageSequenceNumber
-						);
-					});
-				});
-			},
-			onError: (err) => {
-				console.error('Failed:', err);
-			},
-		});
-	}
 	const { drawBroadcastPath } = useBroadcastPath(
 		drawIncrementalPath,
 		drawDotOnCanvas
@@ -103,7 +56,34 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		strokeNumber,
 		clearIncompletePacketTimeout,
 		incompletePacketTimeout,
+		createPackagesFromBuffer,
+		createFinalPackage,
 	} = usePacketSending(socket, analytics);
+
+	const getOnboardingDataMutation = useGetOnboardingData(
+		'http://localhost:3010'
+	);
+
+	// hook to get onboarding data
+	const { loadOnboardingData, isLoading, isError } = useOnboardingData({
+		drawBroadcastPath,
+		getOnboardingDataMutation,
+	});
+
+	// Handler for onboarding button
+	const handleGetOnboardingData = useCallback(
+		async (e: React.MouseEvent) => {
+			e.preventDefault();
+
+			try {
+				await loadOnboardingData();
+				logger.info('Onboarding data loaded successfully');
+			} catch (error) {
+				logger.error('Failed to load onboarding data', error);
+			}
+		},
+		[loadOnboardingData]
+	);
 
 	const startDrawing = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -138,48 +118,56 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				pointsBuffer.current.push(pos);
 			}
 
+			// Send packages over network
 			handlePackageSending();
 
-			if (requestRef.current) {
-				cancelAnimationFrame(requestRef.current);
-			}
+			// Create packages for local rendering
+			const { packages, remainingPoints } = createPackagesFromBuffer(
+				strokePointsRef.current.slice(lastDrawnIndexRef.current),
+				packageNumber.current
+			);
 
-			requestRef.current = requestAnimationFrame(() => {
-				console.debug('rAF executing...');
-				const lastDrawnIndex = lastDrawnIndexRef.current;
-				const totalPoints = strokePointsRef.current.length;
+			logger.debug(pointsBuffer.current, 'points buffer content:');
 
-				if (totalPoints <= lastDrawnIndex) {
-					requestRef.current = null;
-					return;
+			// Render packages locally (same as broadcast rendering)
+			packages.forEach((pkg, index) => {
+				const packageId = `${strokeId.current}-${pkg.packageSequenceNumber}`;
+				const previousPackageId = `${strokeId.current}-${pkg.packageSequenceNumber - 1}`;
+
+				// Get context points from previous package (for Catmull-Rom)
+				const contextPoints =
+					pkg.packageSequenceNumber > 1
+						? strokePointsRef.current.slice(
+								Math.max(0, lastDrawnIndexRef.current - 2),
+								lastDrawnIndexRef.current
+							)
+						: [];
+
+				logger.debug('Rendering local package', {
+					packageId,
+					sequenceNumber: pkg.packageSequenceNumber,
+					contextPointsCount: contextPoints.length,
+					newPointsCount: pkg.points.length,
+				});
+
+				// Render with same interpolation as broadcast
+				if (pkg.points.length >= 2) {
+					drawIncrementalPath(contextPoints, pkg.points);
+				} else if (pkg.points.length === 1) {
+					drawDotOnCanvas(pkg.points[0]);
 				}
 
-				const contextStart = Math.max(Math.max(0, lastDrawnIndex - 2) - 1, 0);
-				logger.debug(
-					'the segment',
-					strokePointsRef.current.slice(contextStart, totalPoints + 1),
-					'lastDrawnIndex',
-					lastDrawnIndex
-				);
-
-				const segment = strokePointsRef.current.slice(
-					contextStart,
-					totalPoints + 1
-				);
-				const oldPointsCount = lastDrawnIndex - contextStart;
-
-				console.debug(
-					`Drawing: total=${totalPoints}, new=${totalPoints - lastDrawnIndex}, ` +
-						`segment=${segment.length}, context=${oldPointsCount},  contextStart=${contextStart}`
-				);
-
-				logger.debug(strokePointsRef.current, 'strokePointsRef');
-				// drawIncrementalPath(segment, oldPointsCount);
-				lastDrawnIndexRef.current = totalPoints;
-				requestRef.current = null;
+				lastDrawnIndexRef.current += pkg.points.length;
 			});
+			logger.debug(JSON.stringify(strokePointsRef.current), 'strokePointsRef');
 		},
-		[isDrawing, handlePackageSending]
+		[
+			isDrawing,
+			handlePackageSending,
+			createPackagesFromBuffer,
+			drawIncrementalPath,
+			drawDotOnCanvas,
+		]
 	);
 
 	const stopDrawing = useCallback(() => {
@@ -194,16 +182,16 @@ export default function Canvas({ socket }: ChildComponentProps) {
 			);
 
 			const strokeSequenceNumber = strokeNumber.current++;
-			const isLastPackage = true;
-			sendPackage({ strokes, isLastPackage, strokeSequenceNumber });
+			const pkg = createFinalPackage(strokes, packageNumber.current++);
+			sendPackage(pkg, strokeSequenceNumber);
 		} else {
 			const strokeSequenceNumber = strokeNumber.current++;
 			const strokes = pointsBuffer.current.splice(
 				0,
 				pointsBuffer.current.length
 			);
-			const isLastPackage = true;
-			sendPackage({ strokes, isLastPackage, strokeSequenceNumber });
+			const pkg = createFinalPackage(strokes, packageNumber.current++);
+			sendPackage(pkg, strokeSequenceNumber);
 		}
 
 		setIsDrawing(false);
@@ -215,9 +203,9 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		}
 	}, [
 		isDrawing,
-		draw,
 		clearIncompletePacketTimeout,
 		sendPackage,
+		createFinalPackage,
 		strokeNumber,
 	]);
 
@@ -257,7 +245,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				style={{ touchAction: 'none' }} // prevents default touch behaviors
 				className='cursor-crosshair border border-gray-300'
 			/>
-			<button onClick={getOnboardingData}> get getOnboardingData</button>
+			<button onClick={handleGetOnboardingData}> get getOnboardingData</button>
 
 			{isLogging && (
 				<div

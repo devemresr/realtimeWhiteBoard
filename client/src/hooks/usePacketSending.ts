@@ -1,18 +1,23 @@
 'use client';
 
-import { useRef, useCallback, useEffect, Ref } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Socket } from 'socket.io-client';
 import { Point, StrokeData } from '../app/types_interfaces/DrawingTypes';
 import DrawingAnalytics from '../util/DrawingAnalytics';
 import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
 import { v4 as uuidv4 } from 'uuid';
+import { usePackageCreator, PackageData } from './usePacketCreator';
 
 const usePacketSending = (
 	socket: Socket | null,
 	analytics: React.MutableRefObject<DrawingAnalytics | null>
 ) => {
-	const POINTS_PER_PACKET = 2; // for catmull we need for 4 points at max and context gets provided by previous packages
 	const INCOMPLETE_PACKAGE_TIMEOUT = 500;
+
+	// Use the package creator hook
+	const { createPackagesFromBuffer, createFinalPackage, POINTS_PER_PACKET } =
+		usePackageCreator({ pointsPerPacket: 2 });
+
 	const pointsBuffer = useRef<Point[]>([]);
 	const retryBuffer = useRef<StrokeData[]>([]);
 	const incompletePacketTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -21,7 +26,7 @@ const usePacketSending = (
 	const strokeId = useRef<string>('');
 
 	const generateStrokeId = useCallback(() => {
-		return Date.now().toString() + uuidv4().toString(); // maybe instead of having meaningless ids migration to meaningfull ones makes more sense
+		return Date.now().toString() + uuidv4().toString();
 	}, []);
 
 	const clearIncompletePacketTimeout = useCallback(() => {
@@ -31,32 +36,21 @@ const usePacketSending = (
 		}
 	}, []);
 
+	/**
+	 * Sends a single package over the network
+	 */
 	const sendPackage = useCallback(
-		({
-			strokes,
-			strokeSequenceNumber,
-			isLastPackage,
-		}: {
-			strokes: Point[];
-			strokeSequenceNumber?: number;
-			isLastPackage?: boolean;
-		}) => {
+		(pkg: PackageData, strokeSequenceNumber?: number) => {
 			if (!socket) return;
 
-			const packageSequenceNumber = packageNumber.current++;
-			// const rooms = ['room1', 'room2', 'room3', 'room4'];
-			// const randomIndex = Math.floor(Math.min(Math.random() * 10, 3));
-			// const randomRoom = rooms[randomIndex];
-
 			const strokeData: StrokeData = {
-				// roomId: randomRoom,
 				roomId: 'room2',
-				strokes,
+				strokes: pkg.points,
 				strokeId: strokeId.current,
-				packageSequenceNumber,
-				...(isLastPackage && { isLastPackage: true }),
+				packageSequenceNumber: pkg.packageSequenceNumber,
+				packageId: `${strokeId.current}-${pkg.packageSequenceNumber}`,
+				...(pkg.isLastPackage && { isLastPackage: true }),
 				strokeSequenceNumber,
-				packageId: `${strokeId.current}-${packageSequenceNumber}`,
 			};
 
 			retryBuffer.current.push(strokeData);
@@ -67,7 +61,17 @@ const usePacketSending = (
 				strokeData
 			);
 		},
-		[socket]
+		[socket, analytics]
+	);
+
+	/**
+	 * Sends multiple packages
+	 */
+	const sendPackages = useCallback(
+		(packages: PackageData[], strokeSequenceNumber?: number) => {
+			packages.forEach((pkg) => sendPackage(pkg, strokeSequenceNumber));
+		},
+		[sendPackage]
 	);
 
 	const scheduleIncompletePacketSending = useCallback(() => {
@@ -77,42 +81,56 @@ const usePacketSending = (
 			}
 
 			incompletePacketTimeout.current = setTimeout(() => {
-				const strokes = pointsBuffer.current.splice(
+				const points = pointsBuffer.current.splice(
 					0,
 					pointsBuffer.current.length
 				);
 				const strokeSequenceNumber = strokeNumber.current;
-				sendPackage({ strokes, strokeSequenceNumber });
+
+				// Create incomplete package
+				const pkg: PackageData = {
+					points,
+					packageSequenceNumber: packageNumber.current++,
+				};
+
+				sendPackage(pkg, strokeSequenceNumber);
 			}, INCOMPLETE_PACKAGE_TIMEOUT);
 		}
 	}, [clearIncompletePacketTimeout, sendPackage]);
 
 	const handlePackageSending = useCallback(() => {
-		const packageThreshold = Math.floor(
-			pointsBuffer.current.length / POINTS_PER_PACKET
+		// Create packages from buffer
+		const { packages, remainingPoints } = createPackagesFromBuffer(
+			pointsBuffer.current,
+			packageNumber.current
 		);
 
-		if (packageThreshold > 0) {
+		if (packages.length > 0) {
 			// Clear any pending timeout since we're sending complete packets
 			if (incompletePacketTimeout.current) {
 				clearTimeout(incompletePacketTimeout.current);
 				incompletePacketTimeout.current = null;
 			}
 
-			// Send complete packets immediately
-			for (let i = 0; i < packageThreshold; i++) {
-				const strokes = pointsBuffer.current.splice(0, POINTS_PER_PACKET);
-				const strokeSequenceNumber = strokeNumber.current;
-				console.log('pointsBuffer before sendPackage: ', pointsBuffer.current);
+			// Send all complete packages
+			const strokeSequenceNumber = strokeNumber.current;
+			sendPackages(packages, strokeSequenceNumber);
 
-				sendPackage({ strokes, strokeSequenceNumber });
-				console.log('pointsBuffer after sendPackage: ', pointsBuffer.current);
-			}
-		} else {
-			// Set timeout for remaining incomplete packet (if any)
+			// Update package number
+			packageNumber.current += packages.length;
+
+			// Update buffer with remaining points
+			pointsBuffer.current = remainingPoints;
+
+			console.log('Sent packages:', packages.length);
+			console.log('Remaining points:', remainingPoints.length);
+		}
+
+		// Set timeout for remaining incomplete packet (if any)
+		if (pointsBuffer.current.length > 0) {
 			scheduleIncompletePacketSending();
 		}
-	}, [sendPackage, scheduleIncompletePacketSending]);
+	}, [createPackagesFromBuffer, sendPackages, scheduleIncompletePacketSending]);
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -120,17 +138,21 @@ const usePacketSending = (
 			console.log('cleanup ran');
 			if (incompletePacketTimeout.current) {
 				clearIncompletePacketTimeout();
-				const strokes = pointsBuffer.current.splice(0);
+
+				const points = pointsBuffer.current.splice(0);
 				const strokeSequenceNumber = strokeNumber.current++;
-				sendPackage({ strokes, strokeSequenceNumber });
+
+				const pkg = createFinalPackage(points, packageNumber.current++);
+				sendPackage(pkg, strokeSequenceNumber);
 			}
 		};
-	}, [clearIncompletePacketTimeout, sendPackage]);
+	}, [clearIncompletePacketTimeout, sendPackage, createFinalPackage]);
 
 	return {
 		pointsBuffer,
 		handlePackageSending,
 		sendPackage,
+		sendPackages,
 		packageNumber,
 		strokeNumber,
 		strokeId,
@@ -138,6 +160,8 @@ const usePacketSending = (
 		clearIncompletePacketTimeout,
 		incompletePacketTimeout,
 		analytics,
+		createPackagesFromBuffer, // expose for custom usage
+		createFinalPackage, // expose for custom usage
 	};
 };
 
