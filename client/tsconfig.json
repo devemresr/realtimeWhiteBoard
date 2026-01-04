@@ -17,11 +17,12 @@
 			{
 				"name": "next"
 			}
-		]
+		],
+		"paths": {
+			"react": ["./node_modules/@types/react"],
+			"@/types": ["../shared/types"]
+		}
 	},
 	"include": ["next-env.d.ts", ".next/types/**/*.ts", "**/*.ts", "**/*.tsx"],
-	"exclude": ["node_modules"],
-	"paths": {
-		"react": ["./node_modules/@types/react"]
-	}
+	"exclude": ["node_modules"]
 }

@@ -1,16 +1,18 @@
-import { Point } from '../../app/types_interfaces/DrawingTypes';
+import { Point } from '../../hooks/networking/packets/usePacketBuilder';
+
+export type PointBase = Omit<Point, 'brushSize' | 'brushColor'>;
 
 const createInterpolator = (config: { maxGap: number }) => {
 	const { maxGap } = config;
 
 	// Catmull-Rom spline - mathematically deterministic usable for user drawing and received drawings
 	const catmullRom = (
-		p0: Point,
-		p1: Point,
-		p2: Point,
-		p3: Point,
+		p0: PointBase,
+		p1: PointBase,
+		p2: PointBase,
+		p3: PointBase,
 		t: number
-	): Point => {
+	): PointBase => {
 		const t2 = t * t;
 		const t3 = t2 * t;
 
@@ -36,19 +38,19 @@ const createInterpolator = (config: { maxGap: number }) => {
 		};
 	};
 
-	const getDistance = (p1: Point, p2: Point): number => {
+	const getDistance = (p1: PointBase, p2: PointBase): number => {
 		return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
 	};
 
 	// Main interpolation function
-	const interpolate = (points: Point[]): Point[] => {
+	const interpolate = (points: PointBase[]): PointBase[] => {
 		if (points.length < 2) return [...points];
 		if (points.length === 2) {
 			// Simple linear interpolation for 2 points
 			return interpolateLinear(points[0], points[1]);
 		}
 
-		const result: Point[] = [];
+		const result: PointBase[] = [];
 
 		for (let i = 0; i < points.length - 1; i++) {
 			const p0 = points[Math.max(0, i - 1)];
@@ -84,7 +86,7 @@ const createInterpolator = (config: { maxGap: number }) => {
 		return result;
 	};
 
-	const interpolateLinear = (p1: Point, p2: Point): Point[] => {
+	const interpolateLinear = (p1: PointBase, p2: PointBase): PointBase[] => {
 		const distance = getDistance(p1, p2);
 		const steps = Math.floor(distance / maxGap);
 

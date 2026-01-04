@@ -321,7 +321,6 @@ class DrawingAnalytics {
 		options: {
 			timeout?: number;
 			retryCount?: number;
-			priority?: 'high' | 'normal' | 'low';
 		} = {}
 	): Promise<boolean> {
 		return new Promise((resolve) => {

@@ -1,16 +1,9 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useMemo } from 'react';
-import { Point } from '../app/types_interfaces/DrawingTypes';
-import createInterpolator from '../util/drawing/interpolation';
-import logger from '../util/logger';
-interface PackageSituation {
-	receivedPackageIds: Set<number>; // O(1) lookup instead of using an array
-	expectedPackageSequenceNumber: number;
-	highestPackageSequenceNumber: number;
-	missingPackageIds: Set<number>;
-	lastPackageSequenceNumber: number;
-}
+import { Point } from '@/types';
+import createInterpolator from '../../../util/drawing/interpolation';
+import logger from '../../../util/logger';
 
 const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 	const requestRef = useRef(null);
@@ -55,6 +48,10 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 			updateContextProps();
 
 			ctx.beginPath();
+			const pointBrushColor = point.brushColor || brushColor;
+			const pointBrushSize = point.brushSize || brushSize;
+			ctxRef.current.strokeStyle = pointBrushColor;
+			ctxRef.current.lineWidth = pointBrushSize;
 			ctx.arc(point.x, point.y, brushSize / 2, 0, Math.PI * 2);
 			ctx.fillStyle = brushColor;
 			ctx.fill();
@@ -68,6 +65,11 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 
 			const ctx = ctxRef.current;
 			updateContextProps();
+
+			const pointBrushColor = toBeDrawnPoints[0].brushColor || brushColor;
+			const pointBrushSize = toBeDrawnPoints[0].brushSize || brushSize;
+			ctxRef.current.strokeStyle = pointBrushColor;
+			ctxRef.current.lineWidth = pointBrushSize;
 
 			if (toBeDrawnPoints.length === 1) {
 				drawDotOnCanvas(toBeDrawnPoints[0]);

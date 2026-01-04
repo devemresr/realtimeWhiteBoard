@@ -2,19 +2,22 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Socket } from 'socket.io-client';
-import usePacketSending from '../hooks/usePacketSending';
-import useCanvasDrawing from '../hooks/useCanvasDrawing';
-import useSocketDrawing from '../hooks/useSocketDrawing';
-import { Point } from '../app/types_interfaces/DrawingTypes';
+import useCanvasDrawing from '../hooks/canvas/drawing/useCanvasDrawing';
+import useSocketSubscription from '../hooks/networking/socket/useSocketSubscription';
+import { Point } from '@/types';
 import CanvasSideBar from './canvasSideBar/canvasSideBar';
 import { CanvasBarKeys, CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
 import Menu from './menu';
-import { useGetOnboardingData } from '../hooks/useFormPosts';
-import useMouseLog from '../hooks/useMouseLog';
+import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
+import useMouseLog from '../hooks/debug/useMouseLog';
 import logger from '../util/logger';
-import { useBroadcastPath } from '../util/drawing/useBroadcastPath';
-import { useOnboardingData } from '../hooks/useOnboardingData';
+import { useBroadcastRenderer } from '../hooks/networking/synchronization/useBroadcastPath';
+import { PacketStatus } from '@/types';
+import { useRoomPacketBuilder } from '../hooks/networking/packets/usePacketBuilder';
+import { useCanvasState } from '../hooks/canvas/state/useCanvasState';
+import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
+import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -22,7 +25,6 @@ interface ChildComponentProps {
 
 export default function Canvas({ socket }: ChildComponentProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const lastDrawnIndexRef = useRef(0);
 	const [selectedElement, setSelectedElement] = useState<CanvasBarKeys>('draw');
 	const [brushShape, setBrushShape] = useState<CanvasShapeKeys>('square');
 	const [textStyle, setTextStyle] = useState({
@@ -32,7 +34,8 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [brushSize, setBrushSize] = useState(8);
 	const [brushColor, setBrushColor] = useState('#000000');
-	const strokePointsRef = useRef([]);
+	const strokePointsRef = useRef<Point[]>([]);
+	const canvasData = useCanvasState();
 
 	const { requestRef, clearCanvas, drawDotOnCanvas, drawIncrementalPath } =
 		useCanvasDrawing(canvasRef, brushColor, brushSize);
@@ -40,35 +43,23 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
 		useMouseLog();
 
-	const { drawBroadcastPath } = useBroadcastPath(
+	const { drawBroadcastPath } = useBroadcastRenderer(
+		canvasData,
 		drawIncrementalPath,
 		drawDotOnCanvas
 	);
 
-	const { analytics } = useSocketDrawing(socket, drawBroadcastPath);
-	const {
-		pointsBuffer,
-		handlePackageSending,
-		sendPackage,
-		generateStrokeId,
-		strokeId,
-		packageNumber,
-		strokeNumber,
-		clearIncompletePacketTimeout,
-		incompletePacketTimeout,
-		createPackagesFromBuffer,
-		createFinalPackage,
-	} = usePacketSending(socket, analytics);
+	const { analytics } = useSocketSubscription(socket, drawBroadcastPath);
+	const roomPacketBuilder = useRoomPacketBuilder({ roomId: 'room2' });
+	const { handlePacketSending } = usePacketTransmitter(socket, canvasData);
 
-	const getOnboardingDataMutation = useGetOnboardingData(
-		'http://localhost:3010'
-	);
+	const getOnboardingDataQuerry = useGetOnboardingData();
 
 	// hook to get onboarding data
-	const { loadOnboardingData, isLoading, isError } = useOnboardingData({
+	const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
 		drawBroadcastPath,
-		getOnboardingDataMutation,
-	});
+		getOnboardingDataQuerry
+	);
 
 	// Handler for onboarding button
 	const handleGetOnboardingData = useCallback(
@@ -89,17 +80,19 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
 			const { offsetX, offsetY } = e.nativeEvent;
 
-			const pos: Point = { x: offsetX, y: offsetY, timestamp: Date.now() };
+			const pos: Point = {
+				x: offsetX,
+				y: offsetY,
+				timestamp: Date.now(),
+				brushColor: brushColor,
+				brushSize: brushSize,
+			};
 			strokePointsRef.current = [pos];
 			setIsDrawing(true);
-			packageNumber.current = 1;
-
-			pointsBuffer.current = [pos];
-			strokeId.current = generateStrokeId();
-
+			roomPacketBuilder.createNewStrokeMetaData();
 			drawDotOnCanvas(pos);
 		},
-		[brushSize, brushColor, generateStrokeId]
+		[brushSize, brushColor]
 	);
 
 	const draw = useCallback(
@@ -113,100 +106,99 @@ export default function Canvas({ socket }: ChildComponentProps) {
 
 			for (const event of events) {
 				const { offsetX, offsetY } = event;
-				const pos: Point = { x: offsetX, y: offsetY, timestamp: Date.now() };
+				const pos: Point = {
+					x: offsetX,
+					y: offsetY,
+					timestamp: Date.now(),
+					brushSize,
+					brushColor,
+				};
 				strokePointsRef.current.push(pos);
-				pointsBuffer.current.push(pos);
 			}
 
-			// Send packages over network
-			handlePackageSending();
-
-			// Create packages for local rendering
-			const { packages, remainingPoints } = createPackagesFromBuffer(
-				strokePointsRef.current.slice(lastDrawnIndexRef.current),
-				packageNumber.current
+			logger.debug(
+				'strokePointsRef.current before getting packeted ',
+				strokePointsRef.current
 			);
 
-			logger.debug(pointsBuffer.current, 'points buffer content:');
+			// Create chunks from current points
+			const { packets, remainingPoints } =
+				roomPacketBuilder.buildPacketsFromPoints(strokePointsRef.current);
+			if (remainingPoints.length > 0) {
+				logger.debug(
+					'packets are created successfully but theres a leftover point'
+				);
+				// Set timeout for remaining incomplete packet (if any)
+				// scheduleIncompletePacketSending();
+			}
+
+			// Update the ref to only keep remaining points
+			strokePointsRef.current = remainingPoints;
+			// store the packets to map
+			packets.forEach((packet) => {
+				canvasData.storePacket({
+					...packet,
+					status: PacketStatus.CREATED,
+				});
+			});
+
+			// Send packages over network
+			logger.debug(
+				'getAllPacketsNeedingRetry before packet sending: ',
+				canvasData.getAllPacketsToSend()
+			);
+			handlePacketSending();
+			logger.debug(
+				'getAllPacketsToSend after packet sending:  ',
+				canvasData.getAllPacketsToSend()
+			);
 
 			// Render packages locally (same as broadcast rendering)
-			packages.forEach((pkg, index) => {
-				const packageId = `${strokeId.current}-${pkg.packageSequenceNumber}`;
-				const previousPackageId = `${strokeId.current}-${pkg.packageSequenceNumber - 1}`;
+			packets.forEach((packet, index) => {
+				const previousPackageId = `${packet.strokeId}-${packet.packetSequenceNumber - 1}`;
 
 				// Get context points from previous package (for Catmull-Rom)
 				const contextPoints =
-					pkg.packageSequenceNumber > 1
-						? strokePointsRef.current.slice(
-								Math.max(0, lastDrawnIndexRef.current - 2),
-								lastDrawnIndexRef.current
-							)
+					packet.packetSequenceNumber !== 1
+						? canvasData.getPacket(packet.strokeId, previousPackageId).points
 						: [];
 
-				logger.debug('Rendering local package', {
-					packageId,
-					sequenceNumber: pkg.packageSequenceNumber,
-					contextPointsCount: contextPoints.length,
-					newPointsCount: pkg.points.length,
-				});
-
 				// Render with same interpolation as broadcast
-				if (pkg.points.length >= 2) {
-					drawIncrementalPath(contextPoints, pkg.points);
-				} else if (pkg.points.length === 1) {
-					drawDotOnCanvas(pkg.points[0]);
+				if (packet.points.length >= 2) {
+					drawIncrementalPath(contextPoints, packet.points);
+				} else if (packet.points.length === 1) {
+					drawDotOnCanvas(packet.points[0]);
 				}
-
-				lastDrawnIndexRef.current += pkg.points.length;
 			});
-			logger.debug(JSON.stringify(strokePointsRef.current), 'strokePointsRef');
 		},
-		[
-			isDrawing,
-			handlePackageSending,
-			createPackagesFromBuffer,
-			drawIncrementalPath,
-			drawDotOnCanvas,
-		]
+		[isDrawing, drawIncrementalPath, drawDotOnCanvas, canvasData]
 	);
 
 	const stopDrawing = useCallback(() => {
 		if (!isDrawing) return;
 
-		if (incompletePacketTimeout.current) {
-			clearIncompletePacketTimeout();
+		// if (incompletePacketTimeout.current) {
+		// 	clearIncompletePacketTimeout();
+		// }
 
-			const strokes = pointsBuffer.current.splice(
-				0,
-				pointsBuffer.current.length
-			);
+		console.log('stop drawing is called: ');
 
-			const strokeSequenceNumber = strokeNumber.current++;
-			const pkg = createFinalPackage(strokes, packageNumber.current++);
-			sendPackage(pkg, strokeSequenceNumber);
-		} else {
-			const strokeSequenceNumber = strokeNumber.current++;
-			const strokes = pointsBuffer.current.splice(
-				0,
-				pointsBuffer.current.length
-			);
-			const pkg = createFinalPackage(strokes, packageNumber.current++);
-			sendPackage(pkg, strokeSequenceNumber);
-		}
+		const packet = roomPacketBuilder.buildFinalPacket(strokePointsRef.current);
+		canvasData.storePacket(packet);
+		handlePacketSending();
 
 		setIsDrawing(false);
 		strokePointsRef.current = [];
-		lastDrawnIndexRef.current = 0;
 
 		if (requestRef.current) {
 			cancelAnimationFrame(requestRef.current);
 		}
 	}, [
 		isDrawing,
-		clearIncompletePacketTimeout,
-		sendPackage,
-		createFinalPackage,
-		strokeNumber,
+		// clearIncompletePacketTimeout,
+		// sendPackage,
+		// createFinalPackage,
+		// strokeNumber,
 	]);
 
 	return (
@@ -245,7 +237,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				style={{ touchAction: 'none' }} // prevents default touch behaviors
 				className='cursor-crosshair border border-gray-300'
 			/>
-			<button onClick={handleGetOnboardingData}> get getOnboardingData</button>
+			<button onClick={handleGetOnboardingData}> get onboardingData</button>
 
 			{isLogging && (
 				<div

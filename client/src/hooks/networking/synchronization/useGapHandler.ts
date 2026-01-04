@@ -1,6 +1,5 @@
-// hooks/useGapHandler.ts
 import { useCallback, useRef } from 'react';
-import logger from '../logger';
+import logger from '../../../util/logger';
 
 interface GapTimer {
 	apiCallTimer: NodeJS.Timeout;
@@ -14,7 +13,7 @@ interface GapHandlerConfig {
 	permanentTimeout: number; // 1500ms - when to declare permanent
 	onGapFilled: (strokeId: string, sequence: number) => void;
 	onGapPermanent: (strokeId: string, sequence: number) => void;
-	fetchPacketFromBackend: (strokeId: string, sequence: number) => Promise<any>;
+	fetchPacket: (strokeId: string, sequence: number) => Promise<any>;
 }
 
 export const useGapHandler = (config: GapHandlerConfig) => {
@@ -47,10 +46,7 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 				);
 
 				try {
-					const packet = await config.fetchPacketFromBackend(
-						strokeId,
-						sequence
-					);
+					const packet = await config.fetchPacket(strokeId, sequence);
 
 					if (packet) {
 						logger.info(`[${gapKey}] Successfully fetched missing packet`);

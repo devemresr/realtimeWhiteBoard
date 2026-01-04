@@ -1,7 +1,8 @@
 'use client';
 
-import useApiMutation from './useMutation';
-import useApiQuery, { QueryConfig } from './useApiQuerry';
+import useApiQuery, { QueryConfig } from '../core/useApiQuerry';
+import useApiMutation from '../core/useApiMutation';
+import { AUTH, CANVAS } from './constants';
 
 export type UserRegistrationRequest = {
 	password: string;
@@ -16,23 +17,32 @@ export type UserRegistrationResponse = {
 
 export function useRegisterUser() {
 	return useApiMutation<UserRegistrationResponse, UserRegistrationRequest>({
-		url: '/auth/register',
+		url: AUTH.REGISTER,
 		method: 'POST',
 	});
 }
 
 export function useLogin() {
 	return useApiMutation<UserRegistrationResponse, UserRegistrationRequest>({
-		url: '/auth/login',
+		url: AUTH.LOGIN,
 		method: 'POST',
 	});
 }
 
-export function useGetOnboardingData(apiType?: string) {
-	return useApiMutation({
-		url: '/onboard',
-		method: 'GET',
-		...(apiType && { apiType }),
+export function useGetOnboardingData() {
+	return useApiQuery({
+		url: CANVAS.ONBOARD,
+		// todo dev purposes should be true
+		requiresAuth: false,
+		serverUrl: process.env.NEXT_PUBLIC_DEV_ONBOARDING_SERVER_URL,
+		enabled: false, // Don't auto-fetch on mount, only when manually triggered
+	});
+}
+export function useGetMissingPacket() {
+	return useApiQuery({
+		url: CANVAS.GET_MISSING_PACKET,
+		// todo dev purposes should be true
+		requiresAuth: false,
 	});
 }
 

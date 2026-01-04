@@ -132,7 +132,7 @@ class SocketController {
 			// setTimeout(
 			// 	() => {
 			// 		console.log(
-			// 			'sending delayed package',
+			// 			'sending delayed packet',
 			// 			delay,
 			// 			delayOrNot,
 			// 			randomlyDelayMore

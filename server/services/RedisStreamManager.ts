@@ -46,7 +46,24 @@ class RedisStreamManager {
 
 		try {
 			// Convert object to redis appropriate string
-			const { roomId, packageId, packageSequenceNumber, strokes } = data;
+			// Build field-value pairs from data object
+			const fields = {
+				roomId: data.roomId,
+				strokeId: data.strokeId,
+				packetSequenceNumber: data.packetSequenceNumber,
+				strokeSequenceNumber: data.strokeSequenceNumber,
+				packetId: data.packetId,
+				originalSocketId: data.originalSocketId,
+				authorId: data.authorId,
+				points: JSON.stringify(data.points),
+				...(data.isLastPackage && { isLastPackage: data.isLastPackage }),
+			};
+
+			// Convert to flat array of [key, value, key, value, ...]
+			const fieldValuePairs = Object.entries(fields).flatMap(([key, value]) => [
+				key,
+				String(value),
+			]);
 			let args: string[] = [];
 
 			// MAXLEN options if needed
@@ -58,24 +75,6 @@ class RedisStreamManager {
 				args.push(options.maxLen.toString());
 			}
 
-			// Multiple field-value pairs
-			args.push(
-				'roomId',
-				roomId,
-				'strokeId',
-				data.strokeId,
-				'packageSequenceNumber',
-				packageSequenceNumber.toString(),
-				'strokeSequenceNumber',
-				data.strokeSequenceNumber.toString(),
-				'packageId',
-				packageId,
-				'originalSocketId',
-				data.originalSocketId,
-				'strokes',
-				JSON.stringify(strokes) // Keep array as JSON
-			);
-
 			if (data.isLastPackage) {
 				args.push('isLastPackage', data.isLastPackage.toString());
 			}
@@ -83,7 +82,8 @@ class RedisStreamManager {
 			const redisMessageId = await this.redis.xadd(
 				this.streamName!,
 				'*',
-				...args
+				...args,
+				...fieldValuePairs
 			);
 			console.log('redisMessageId', redisMessageId);
 

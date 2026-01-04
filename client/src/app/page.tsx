@@ -9,7 +9,7 @@ import {
 	useLogin,
 	useRegisterUser,
 	UserRegistrationRequest,
-} from '../hooks/useFormPosts';
+} from '../hooks/api/endpoints/useFormPosts';
 import { Socket } from 'socket.io-client';
 const whiteBoardApp = () => {
 	const [connected, setConnected] = useState(false);

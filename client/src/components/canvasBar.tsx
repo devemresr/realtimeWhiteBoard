@@ -12,7 +12,7 @@ import {
 	TrashSVG,
 } from '../constants/svgs';
 import { CanvasBarItem } from './types';
-import useMouseLog from '../hooks/useMouseLog';
+import useMouseLog from '../hooks/debug/useMouseLog';
 
 const color = '#2f2f2f';
 

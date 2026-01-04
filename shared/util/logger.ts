@@ -20,15 +20,16 @@ const logger = pino({
 
 	...(!isDev && {
 		base: undefined,
-		// Readable timestamp
-		timestamp: () => `,"timestamp":"${new Date().toISOString()}"`,
-		// Use string level names instead of numbers
+		timestamp: pino.stdTimeFunctions.isoTime, // More efficient than custom function
 		formatters: {
-			level: (label) => {
-				return { level: label };
-			},
+			level: (label) => ({ level: label }),
 		},
 	}),
+
+	// Add error serialization for better error logging
+	serializers: {
+		error: pino.stdSerializers.err,
+	},
 });
 
 export default logger;

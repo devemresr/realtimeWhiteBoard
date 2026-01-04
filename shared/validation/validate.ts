@@ -1,5 +1,4 @@
 import { Schema } from 'joi';
-import { GenericObject } from '../types/basicTypes';
 
 interface ValidationError {
 	message: string;
@@ -21,20 +20,23 @@ interface ValidationFailure {
 
 type ValidationResult<T> = ValidationSuccess<T> | ValidationFailure;
 
-interface ValidationSchemas {
-	[key: string]: Schema;
-}
+type ValidationSchemas<T> = {
+	[K in keyof T]?: Schema;
+};
 
-export default function validateInput<T extends GenericObject>(
+export default function validateInput<T extends object>(
 	values: T,
-	schemas: ValidationSchemas
+	schemas: ValidationSchemas<T>
 ): ValidationResult<T> {
 	const errors: ValidationErrors = {};
 
-	for (const [key, schema] of Object.entries(schemas)) {
-		const { error }: { error?: any } = schema.validate(values[key]);
+	for (const key in schemas) {
+		const schema = schemas[key];
+		if (!schema) continue;
+
+		const { error } = schema.validate(values[key]);
 		if (error) {
-			errors[key] = { message: error.details[0].message };
+			errors[key] = { message: error.message };
 		}
 	}
 

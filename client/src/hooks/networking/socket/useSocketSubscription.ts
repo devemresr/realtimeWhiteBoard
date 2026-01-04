@@ -1,11 +1,11 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { SOCKET_EVENTS } from '../../../shared/constants/socketIoConstants';
-import DrawingAnalytics from '../util/DrawingAnalytics';
-import logger from '../util/logger';
+import { SOCKET_EVENTS } from '../../../../../shared/constants/socketIoConstants';
+import DrawingAnalytics from '../../../util/DrawingAnalytics';
+import logger from '../../../util/logger';
 
-const useSocketDrawing = (socket, drawBroadcastPath: Function) => {
+const useSocketSubscription = (socket, drawBroadcastPath: Function) => {
 	const analytics = useRef(null);
 
 	useEffect(() => {
@@ -17,21 +17,11 @@ const useSocketDrawing = (socket, drawBroadcastPath: Function) => {
 
 		const handleDrawingPacket = (data) => {
 			logger.debug('Received broadcasted data: ', data);
-			const isFirstPackage = data.packageSequenceNumber === 1;
-			const isLastPackage = data.isLastPackage;
-			console.log(
-				'lastPackage Received for stroke: ',
-				data.strokeSequenceNumber
-			);
+			const isFirstPacket = data.packetSequenceNumber === 1;
+			const isLastPacket = data.isLastPacket;
+			logger.debug('received event: ', data);
 
-			drawBroadcastPath(
-				data.strokes,
-				isFirstPackage,
-				isLastPackage,
-				data.packageId,
-				data.strokeId,
-				data.packageSequenceNumber
-			);
+			drawBroadcastPath(data);
 		};
 
 		socket.on(
@@ -44,4 +34,4 @@ const useSocketDrawing = (socket, drawBroadcastPath: Function) => {
 	return { analytics };
 };
 
-export default useSocketDrawing;
+export default useSocketSubscription;
