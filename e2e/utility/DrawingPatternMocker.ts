@@ -21,7 +21,7 @@ export class DrawingPatternMocker {
 	}
 
 	async init(): Promise<void> {
-		this.canvas = this.page.getByTitle('canvas');
+		this.canvas = this.page.getByLabel('canvas');
 		this.canvasBounds = await this.canvas.boundingBox();
 		if (!this.canvasBounds) {
 			throw new Error('Canvas not found or not visible');

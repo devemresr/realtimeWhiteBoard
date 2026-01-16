@@ -10,7 +10,7 @@ import { useSocketEmit } from '../socket/useSocketEmit';
 
 const usePacketTransmitter = (
 	socket: Socket | null,
-	canvasData: ReturnType<typeof useCanvasState>
+	canvasState: ReturnType<typeof useCanvasState>
 ) => {
 	const { emit } = useSocketEmit(socket);
 	/**
@@ -23,7 +23,7 @@ const usePacketTransmitter = (
 				return;
 			}
 
-			canvasData.updatePacketStatus(
+			canvasState.updatePacketStatus(
 				packet.strokeId,
 				packet.packetId,
 				PacketStatus.SENDING
@@ -34,14 +34,14 @@ const usePacketTransmitter = (
 				toNetworkPacket(packet)
 			);
 			if (result.success) {
-				canvasData.updatePacketStatus(
+				canvasState.updatePacketStatus(
 					packet.strokeId,
 					packet.packetId,
 					PacketStatus.SENT
 				);
 			}
 			if (result.error) {
-				canvasData.updatePacketStatus(
+				canvasState.updatePacketStatus(
 					packet.strokeId,
 					packet.packetId,
 					PacketStatus.FAILED
@@ -52,7 +52,7 @@ const usePacketTransmitter = (
 				});
 			}
 		},
-		[socket, emit, canvasData, toNetworkPacket]
+		[socket, emit, canvasState, toNetworkPacket]
 	);
 
 	function toNetworkPacket(
@@ -66,13 +66,13 @@ const usePacketTransmitter = (
 	 * Handle all packet sending logic
 	 */
 	const handlePacketSending = useCallback(() => {
-		const packets = canvasData.getAllPacketsToSend();
+		const packets = canvasState.getAllPacketsToSend();
 		console.log('all the packets to send', packets);
 
 		// Send all created packets
 		packets.forEach((packet) => sendPacket(packet));
 		return true;
-	}, [sendPacket, canvasData]);
+	}, [sendPacket, canvasState]);
 
 	return {
 		handlePacketSending,

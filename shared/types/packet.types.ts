@@ -31,6 +31,7 @@ export interface StrokePacket {
 	packetSequenceNumber: number;
 	strokeSequenceNumber: number;
 	isLastPacket?: boolean;
+	isErased: boolean;
 
 	// ===== Drawing Data =====
 	// Sent over the wire
@@ -59,3 +60,13 @@ export type TrackedStrokePacket = StrokePacket & {
 	status: PacketStatus;
 	lastAttemptTimestamp: number;
 };
+
+/**
+ * Bounding box information for packets' point data
+ */
+export interface BoundingBox {
+	minX: number;
+	maxX: number;
+	minY: number;
+	maxY: number;
+}

@@ -27,7 +27,6 @@ test.beforeEach(async ({ page }) => {
 
 let index = 0;
 const pages: Page[] = [];
-// todo
 test('random drawings', async ({ browser }) => {
 	for (let i = 0; i < 1; i++) {
 		for (let a = 0; a < 2; a++) {

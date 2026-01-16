@@ -12,7 +12,6 @@ import {
 	TrashSVG,
 } from '../constants/svgs';
 import { CanvasBarItem } from './types';
-import useMouseLog from '../hooks/debug/useMouseLog';
 
 const color = '#2f2f2f';
 
@@ -33,7 +32,7 @@ export default function CanvasBar({
 		{ key: 'text', icon: <TextSVG color={color} /> },
 		{ key: 'line', icon: <LineSVG color={color} /> },
 		{ key: 'image', icon: <ImageSVG color={color} /> },
-		{ key: 'clear', icon: <TrashSVG color={color} />, trigger: clearCanvas },
+		{ key: 'clear', icon: <TrashSVG color={color} />, handler: clearCanvas },
 	];
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,8 +41,8 @@ export default function CanvasBar({
 				const index = parseInt(key, 10) - 1;
 				if (canvasBarItems[index]) {
 					setSelectedElement(canvasBarItems[index].key);
-					if (canvasBarItems[index].trigger) {
-						canvasBarItems[index].trigger();
+					if (canvasBarItems[index].handler) {
+						canvasBarItems[index].handler();
 					}
 				}
 				return;
@@ -52,7 +51,7 @@ export default function CanvasBar({
 				const lastIndex = canvasBarItems.length - 1;
 				if (canvasBarItems[lastIndex]) {
 					setSelectedElement(canvasBarItems[lastIndex].key);
-					canvasBarItems[lastIndex].trigger();
+					canvasBarItems[lastIndex].handler();
 				}
 			}
 		};
@@ -65,8 +64,8 @@ export default function CanvasBar({
 			{canvasBarItems.map((item, index) => {
 				const handleElementSelection = () => {
 					setSelectedElement(item.key);
-					if (item.trigger) {
-						item.trigger();
+					if (item.handler) {
+						item.handler();
 					}
 				};
 				return (

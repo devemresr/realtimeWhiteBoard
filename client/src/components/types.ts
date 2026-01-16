@@ -1,26 +1,16 @@
+import { ToolType } from '@/types';
 import { JSX } from 'react';
 
-export type CanvasBarKeys =
-	| 'drag'
-	| 'pointer'
-	| 'draw'
-	| 'paint'
-	| 'erase'
-	| 'shape'
-	| 'text'
-	| 'line'
-	| 'image'
-	| 'clear';
 export type CanvasBarItem = {
-	key: CanvasBarKeys;
+	key: ToolType;
 	icon: JSX.Element;
-	trigger?: () => void;
+	handler?: () => void;
 };
 
 export type CanvasShapeKeys = 'square' | 'triangle' | 'circle' | 'star';
 
 export type CanvasSideBarProps = {
-	selectedElement: CanvasBarKeys;
+	selectedElement: ToolType;
 	brushColor: string;
 	setBrushColor: React.Dispatch<React.SetStateAction<string>>;
 	brushSize: number;

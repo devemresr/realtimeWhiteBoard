@@ -6,7 +6,6 @@ import createInterpolator from '../../../util/drawing/interpolation';
 import logger from '../../../util/logger';
 
 const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
-	const requestRef = useRef(null);
 	const ctxRef = useRef(null);
 	const contextPropsRef = useRef({ brushColor: null, brushSize: null });
 	const interpolator = createInterpolator({
@@ -124,17 +123,7 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 		}
 	}, []);
 
-	// cleanup for rAF
-	useEffect(() => {
-		return () => {
-			if (requestRef.current) {
-				cancelAnimationFrame(requestRef.current);
-			}
-		};
-	}, []);
-
 	return {
-		requestRef,
 		clearCanvas,
 		drawDotOnCanvas,
 		drawIncrementalPath,
