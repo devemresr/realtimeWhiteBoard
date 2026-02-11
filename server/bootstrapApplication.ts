@@ -12,7 +12,7 @@ import { REDIS_CLIENTS } from '../shared/constants/socketIoConstants';
 
 export async function bootstrapApplication(
 	serverReference: HttpServer,
-	port: string
+	port: string,
 ): Promise<any> {
 	try {
 		// Initialize Socket.IO
@@ -35,7 +35,7 @@ export async function bootstrapApplication(
 			{
 				port: 6380,
 			},
-			REDIS_CLIENTS.ADAPTER
+			REDIS_CLIENTS.ADAPTER,
 		);
 		redisAdapterInstance.on('error', (err) => console.error('adapter', err));
 		console.log('Redis Adapter initialized');
@@ -43,7 +43,7 @@ export async function bootstrapApplication(
 		// initialize redis adapter
 		const socketManager = new SocketManager(
 			io,
-			redisAdapterInstance.getClient()
+			redisAdapterInstance.getClient(),
 		);
 		await socketManager.initializeRedisAdapter();
 
@@ -52,7 +52,7 @@ export async function bootstrapApplication(
 			{
 				port: 6379,
 			},
-			REDIS_CLIENTS.MAIN
+			REDIS_CLIENTS.MAIN,
 		);
 		redisMain.on('error', (err) => console.error('redisMain', err));
 
@@ -68,12 +68,12 @@ export async function bootstrapApplication(
 			io,
 			redisMain.getClient(),
 			redisStreamManager,
-			tokenBucketManager
+			tokenBucketManager,
 		);
 
 		io.on(
 			'connection',
-			socketController.handleConnection.bind(socketController)
+			socketController.handleConnection.bind(socketController),
 		);
 
 		// Setup admin UI

@@ -1,32 +1,57 @@
 'use client';
 
-import { useRef, useCallback, useEffect, useMemo } from 'react';
-import { Point } from '@/types';
+import { useRef, useCallback, useEffect } from 'react';
+import {
+	BasePoint,
+	CanvasPoint,
+	DrawingPoint,
+	EraserPoint,
+	Packet,
+	PacketType,
+} from '@/types';
 import createInterpolator from '../../../util/drawing/interpolation';
 import logger from '../../../util/logger';
 
-const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
-	const ctxRef = useRef(null);
+export type DrawIncrementalPathFn = <T extends Packet>(
+	previousPacket: T,
+	currentPacket: T,
+) => { interpolatedPoints: CanvasPoint[]; didInterpolated: boolean };
+
+interface BrushOptions {
+	brushColor: string;
+	brushSize: number;
+}
+
+export type GetEnrichedInterpolatedPointsFn = <T extends Packet>(
+	previousPacket: T,
+	currentPacket: T,
+) => CanvasPoint[];
+
+export type DrawDotOnCanvasFn = (point: CanvasPoint, type: PacketType) => void;
+
+const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
+	const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const contextPropsRef = useRef({ brushColor: null, brushSize: null });
 	const interpolator = createInterpolator({
-		maxGap: 5, // max pixels till no interpolation
+		maxGap: 5,
 	});
+	const { brushColor, brushSize } = brushOptions;
 
 	const setupContext = useCallback(() => {
-		if (canvasRef.current && !ctxRef.current) {
-			ctxRef.current = canvasRef.current.getContext('2d');
-			ctxRef.current.imageSmoothingEnabled = true;
-			ctxRef.current.imageSmoothingQuality = 'high';
-			ctxRef.current.lineCap = 'round';
-			ctxRef.current.lineJoin = 'round';
-		}
-	}, [canvasRef]);
+		if (!canvasRef.current || ctxRef.current) return;
+		const ctx = canvasRef.current.getContext('2d');
+		if (!ctx) return;
+		ctx.imageSmoothingEnabled = true;
+		ctx.imageSmoothingQuality = 'high';
+		ctx.lineCap = 'round';
+		ctx.lineJoin = 'round';
+		ctxRef.current = ctx;
+	}, []);
 
 	useEffect(() => {
 		setupContext();
 	}, [setupContext]);
 
-	// Only update context properties when they actually change
 	const updateContextProps = useCallback(() => {
 		if (
 			ctxRef.current &&
@@ -40,92 +65,228 @@ const useCanvasDrawing = (canvasRef, brushColor, brushSize) => {
 		}
 	}, [brushColor, brushSize]);
 
-	const drawDotOnCanvas = useCallback(
-		(point: Point) => {
+	const drawDotOnCanvas: DrawDotOnCanvasFn = useCallback(
+		(point, type) => {
 			if (!ctxRef.current) return;
 			const ctx = ctxRef.current;
 			updateContextProps();
 
+			// Determine properties based on point type
+			let pointBrushColor: string;
+			let pointBrushSize: number;
+
+			switch (type) {
+				case PacketType.DRAWING:
+					const firstPoint = point as DrawingPoint;
+					pointBrushColor = firstPoint.brushColor;
+					pointBrushSize = firstPoint.brushSize;
+					break;
+				case PacketType.ERASER:
+					pointBrushColor = brushColor; // Use default for eraser
+					pointBrushSize = (point as EraserPoint).brushSize;
+					break;
+			}
+
 			ctx.beginPath();
-			const pointBrushColor = point.brushColor || brushColor;
-			const pointBrushSize = point.brushSize || brushSize;
-			ctxRef.current.strokeStyle = pointBrushColor;
-			ctxRef.current.lineWidth = pointBrushSize;
-			ctx.arc(point.x, point.y, brushSize / 2, 0, Math.PI * 2);
-			ctx.fillStyle = brushColor;
+			ctx.strokeStyle = pointBrushColor;
+			ctx.lineWidth = pointBrushSize;
+			ctx.arc(point.x, point.y, pointBrushSize / 2, 0, Math.PI * 2);
+			ctx.fillStyle = pointBrushColor;
 			ctx.fill();
 		},
-		[brushSize, brushColor, updateContextProps]
+		[brushSize, brushColor, updateContextProps],
 	);
 
-	const drawIncrementalPath = useCallback(
-		(contextPoints: Point[], toBeDrawnPoints: Point[]) => {
-			if (!ctxRef.current || toBeDrawnPoints.length === 0) return;
+	const getInterpolatedPoints = (
+		contextPoints: BasePoint[],
+		toBeDrawnPoints: BasePoint[],
+	): BasePoint[] => {
+		const interpolated = interpolator.interpolate([
+			...contextPoints,
+			...toBeDrawnPoints,
+		]);
+
+		return interpolated;
+	};
+
+	const drawInterpolatedPoints = useCallback(
+		(
+			points: CanvasPoint[],
+			type: PacketType,
+			brushColorOverride?: string,
+			brushSizeOverride?: number,
+		) => {
+			if (!ctxRef.current || points.length === 0) return;
 
 			const ctx = ctxRef.current;
 			updateContextProps();
 
-			const pointBrushColor = toBeDrawnPoints[0].brushColor || brushColor;
-			const pointBrushSize = toBeDrawnPoints[0].brushSize || brushSize;
-			ctxRef.current.strokeStyle = pointBrushColor;
-			ctxRef.current.lineWidth = pointBrushSize;
+			// Determine brush properties based on point type
+			let pointBrushColor: string;
+			let pointBrushSize: number;
 
-			if (toBeDrawnPoints.length === 1) {
-				drawDotOnCanvas(toBeDrawnPoints[0]);
+			switch (type) {
+				case PacketType.DRAWING:
+					const firstPoint = points[0] as DrawingPoint;
+					pointBrushColor = brushColorOverride || firstPoint.brushColor;
+					pointBrushSize = brushSizeOverride || firstPoint.brushSize;
+					break;
+				case PacketType.ERASER:
+					pointBrushColor = brushColorOverride || brushColor;
+					pointBrushSize =
+						brushSizeOverride || (points[0] as EraserPoint).brushSize;
+					break;
+				default:
+					return [];
+			}
+
+			ctx.strokeStyle = pointBrushColor;
+			ctx.lineWidth = pointBrushSize;
+
+			// Single dot case
+			if (points.length === 1) {
+				drawDotOnCanvas(points[0], type);
 				return;
 			}
 
-			logger.debug(
-				'received interpolation: contextPoints: ',
-				JSON.stringify(contextPoints),
-				'received interpolation segment: ',
-				JSON.stringify(toBeDrawnPoints)
-			);
-			logger.debug(
-				'before interpolation',
-				JSON.stringify([...contextPoints, ...toBeDrawnPoints], null, 2)
-			);
-			const interpolated = interpolator.interpolate([
-				...contextPoints,
-				...toBeDrawnPoints,
-			]);
-			logger.debug(
-				`after interpolation:`,
-				JSON.stringify(interpolated, null, 2)
-			);
-
-			let startIndex = 0;
-
-			if (startIndex >= interpolated.length) {
-				console.log('Nothing new to draw after skip');
-				return;
-			}
-
+			// Draw path
 			ctx.beginPath();
-			ctx.moveTo(interpolated[startIndex].x, interpolated[startIndex].y);
+			ctx.moveTo(points[0].x, points[0].y);
 
-			for (let i = startIndex + 1; i < interpolated.length; i++) {
-				ctx.lineTo(interpolated[i].x, interpolated[i].y);
+			for (let i = 1; i < points.length; i++) {
+				ctx.lineTo(points[i].x, points[i].y);
 			}
 
-			console.log(`Drew ${interpolated.length - startIndex} points`);
 			ctx.stroke();
 		},
-		[interpolator, updateContextProps, drawDotOnCanvas]
+		[updateContextProps, drawDotOnCanvas, brushColor, brushSize],
 	);
 
-	// todo make an api call to server to flag everything as deleteddrawBroadcastPath,
+	/**
+	 * Enriches interpolated base points with tool-specific properties.
+	 *
+	 * Supports multiple point types for different canvas tools:
+	 * - DrawingPoint: Regular brush strokes (brushColor, brushSize)
+	 * - EraserPoint: Eraser strokes (brushSize only)
+	 * - LassoPoint: Selection path points (selectionId, isComplete)
+	 * - TransformPoint: Dragged/moved stroke points (deltaX, deltaY, transformId)
+	 * - ShapePoint: Geometric shapes (shapeType, shape params)
+	 *
+	 * @param contextPoints - Previous points for smooth interpolation
+	 * @param toBeDrawnPoints - New points to be interpolated and enriched
+	 * @returns Interpolated points with tool-specific properties preserved
+	 */
+	const enrichInterpolatedPoints = (
+		interpolatedPoints: CanvasPoint[],
+		pointToExtractProperities: CanvasPoint,
+	) => {
+		if (interpolatedPoints.length === 0) return [];
+
+		// Extract all properties except x, y from the first point
+		const { x, y, timestamp, ...additionalProps } = pointToExtractProperities;
+
+		return interpolatedPoints.map((point) => ({
+			...point,
+			...additionalProps,
+		}));
+	};
+
+	/**
+	 * Gets interpolated points and enriches them with tool-specific properties.
+	 * Does not draw to canvas.
+	 *
+	 * @param previousPacket - Previous packet for smooth interpolation
+	 * @param currentPacket - Current packet to be interpolated and enriched
+	 * @returns Enriched interpolated points ready for drawing
+	 */
+	const getEnrichedInterpolatedPoints: GetEnrichedInterpolatedPointsFn = <
+		T extends Packet,
+	>(
+		previousPacket: T,
+		currentPacket: T,
+	): CanvasPoint[] => {
+		if (
+			!currentPacket ||
+			currentPacket?.points.length === 0 ||
+			!previousPacket ||
+			previousPacket?.points.length === 0
+		) {
+			return [];
+		}
+		const baseInterpolatedPoints = getInterpolatedPoints(
+			previousPacket.points,
+			currentPacket.points,
+		);
+
+		const pointToExtractProperities = currentPacket.points[0];
+
+		const interpolatedPoints: CanvasPoint[] = enrichInterpolatedPoints(
+			baseInterpolatedPoints,
+			pointToExtractProperities,
+		);
+
+		return interpolatedPoints;
+	};
+
+	/**
+	 * Gets enriched interpolated points and draws them to canvas.
+	 * Combines interpolation, enrichment, and drawing in one operation.
+	 *
+	 * @param previousPacket - Previous packet for smooth interpolation
+	 * @param currentPacket - Current packet to be interpolated, enriched, and drawn
+	 * @returns Enriched interpolated points that were drawn
+	 */
+	const drawIncrementalPath: DrawIncrementalPathFn = (
+		previousPacket,
+		currentPacket,
+	) => {
+		const interpolatedPoints = getEnrichedInterpolatedPoints(
+			previousPacket,
+			currentPacket,
+		);
+		const didInterpolated =
+			interpolatedPoints.length !== 0 &&
+			previousPacket?.points.length + currentPacket?.points.length !==
+				interpolatedPoints.length;
+
+		logger.debug(
+			'interpolatedPoints:',
+			interpolatedPoints,
+			'interpolatedPoints.length: ',
+			interpolatedPoints.length,
+			'previousPacket?.points.length: ',
+			previousPacket?.points.length,
+			'currentPacket?.points.length: ',
+			currentPacket?.points.length,
+			'didInterpolated: ',
+			didInterpolated,
+		);
+
+		if (interpolatedPoints.length === 0) {
+			return { interpolatedPoints: [], didInterpolated: false };
+		}
+
+		const packetType = currentPacket?.type || previousPacket?.type;
+		drawInterpolatedPoints(interpolatedPoints, packetType);
+
+		return { interpolatedPoints, didInterpolated };
+	};
+
 	const clearCanvas = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (canvas) {
 			const ctx = canvas.getContext('2d');
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			if (ctx) {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+			}
 		}
 	}, []);
 
 	return {
 		clearCanvas,
 		drawDotOnCanvas,
+		getInterpolatedPoints,
+		getEnrichedInterpolatedPoints,
 		drawIncrementalPath,
 	};
 };

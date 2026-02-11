@@ -54,4 +54,12 @@ export type ToolType =
 /**
  * Map of tool types to their handlers
  */
-export type ToolHandlersMap = Record<ToolType, ToolHandlers>;
+
+export interface ToolInstance extends ToolHandlers {
+	/**
+	 * True while this tool is actively handling a pointer interaction
+	 */
+	isInteracting: boolean;
+}
+
+export type ToolHandlersMap = Record<ToolType, ToolInstance>;

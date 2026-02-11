@@ -2,7 +2,8 @@
 
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { Socket } from 'socket.io-client';
-import useCanvasDrawing from '../hooks/canvas/drawing/useCanvasDrawing';
+// import useCanvasDrawing from '../hooks/canvas/drawing/useCanvasDrawing';
+import useCanvasDrawing from '../../mocks/mockuseCanvasDrawing';
 import useSocketSubscription from '../hooks/networking/socket/useSocketSubscription';
 import { ToolHandlersMap, ToolType } from '@/types';
 import CanvasSideBar from './canvasSideBar/canvasSideBar';
@@ -11,14 +12,15 @@ import CanvasBar from './canvasBar';
 import Menu from './menu';
 import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
 import useMouseLog from '../hooks/debug/useMouseLog';
-import logger from '../util/logger';
 import { useBroadcastRenderer } from '../hooks/networking/synchronization/useBroadcastPath';
-import { PacketStatus } from '@/types';
 import { useRoomPacketBuilder } from '../hooks/networking/packets/usePacketBuilder';
 import { useCanvasState } from '../hooks/canvas/state/useCanvasState';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
-import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
-import { useDrawTool } from '../hooks/useDrawTool';
+// import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
+import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
+import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
+import { useEraserManager } from '../hooks/canvas/drawing/useEraserManager';
+import { useCollisionDetection } from '../hooks/useCollisionDetection';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -34,10 +36,29 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	});
 	const [brushSize, setBrushSize] = useState(8);
 	const [brushColor, setBrushColor] = useState('#000000');
-	const canvasState = useCanvasState();
+	// TODO: Implement responsive canvas with coordinate transformation
+	// Replace offsetX/offsetY with getCanvasCoordinates() helper that transforms
+	// pointer events from display space to internal canvas resolution (1920x1080)
+	const canvasState = useCanvasState({
+		canvasHeight: 1800,
+		canvasWidth: 1000,
+	});
+	const {
+		getStrokeIdsNearPoint,
+		getStrokeBoundingBox,
+		storeStrokeInterpolatedPoints,
+		getStrokeInterpolatedPoints,
+	} = canvasState;
 
-	const { clearCanvas, drawDotOnCanvas, drawIncrementalPath } =
-		useCanvasDrawing(canvasRef, brushColor, brushSize);
+	const {
+		clearCanvas,
+		drawDotOnCanvas,
+		drawIncrementalPath,
+		getEnrichedInterpolatedPoints,
+	} = useCanvasDrawing(canvasRef, {
+		brushColor,
+		brushSize,
+	});
 
 	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
 		useMouseLog();
@@ -45,7 +66,8 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { drawBroadcastPath } = useBroadcastRenderer(
 		canvasState,
 		drawIncrementalPath,
-		drawDotOnCanvas
+		storeStrokeInterpolatedPoints,
+		drawDotOnCanvas,
 	);
 
 	const { analytics } = useSocketSubscription(socket, drawBroadcastPath);
@@ -59,38 +81,64 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		canvasState,
 		drawDotOnCanvas,
 		drawIncrementalPath,
+		storeStrokeInterpolatedPoints,
 		handlePacketSending,
 	});
 
+	const collisionDetection = useCollisionDetection(getStrokeInterpolatedPoints);
+
+	const eraserManager = useEraserManager({
+		canvasWidth: 1800,
+		canvasHeight: 1000,
+		canvasState,
+		drawIncrementalPath,
+		drawDotOnCanvas,
+		getStrokeBoundingBox,
+		getStrokeIdsNearPoint,
+		collisionDetection,
+		clearCanvas,
+		gridSize: 100,
+	});
+
+	const eraserTool = useEraserTool({
+		canvasRef,
+		canvasState,
+		eraserSize: brushSize,
+		eraserManager,
+		roomPacketBuilder,
+		getEnrichedInterpolatedPoints,
+		handlePacketSending,
+	});
 	const tools = useMemo<Partial<ToolHandlersMap>>(
 		() => ({
 			draw: drawTool,
+			erase: eraserTool,
 		}),
-		[drawTool]
+		[drawTool],
 	);
 
 	const getOnboardingDataQuerry = useGetOnboardingData();
 
 	// hook to get onboarding data
-	const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
-		drawBroadcastPath,
-		getOnboardingDataQuerry
-	);
+	// const { loadOnboardsingData, isLoading, isError } = useOnboardingSync(
+	// 	drawBroadcastPath,
+	// 	getOnboardingDataQuerry,
+	// );
 
-	// Handler for onboarding button
-	const handleGetOnboardingData = useCallback(
-		async (e: React.MouseEvent) => {
-			e.preventDefault();
+	// // Handler for onboarding button
+	// const handleGetOnboardingData = useCallback(
+	// 	async (e: React.MouseEvent) => {
+	// 		e.preventDefault();
 
-			try {
-				await loadOnboardingData();
-				logger.info('Onboarding data loaded successfully');
-			} catch (error) {
-				logger.error('Failed to load onboarding data', error);
-			}
-		},
-		[loadOnboardingData]
-	);
+	// 		try {
+	// 			await loadOnboardingData();
+	// 			logger.info('Onboarding data loaded successfully');
+	// 		} catch (error) {
+	// 			logger.error('Failed to load onboarding data', error);
+	// 		}
+	// 	},
+	// 	[loadOnboardingData],
+	// );
 
 	const startInteraction = (e: React.PointerEvent<HTMLCanvasElement>) => {
 		const currentTool = tools[selectedElement];
@@ -108,60 +156,63 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	};
 
 	return (
-		<div className=' flex relative'>
-			<Menu />
-			<CanvasBar
-				setSelectedElement={setSelectedElement}
-				selectedElement={selectedElement}
-				clearCanvas={clearCanvas}
-				isLogging={isLogging}
-				setIsLogging={setIsLogging}
-			/>
-			<CanvasSideBar
-				selectedElement={selectedElement}
-				brushColor={brushColor}
-				setBrushColor={setBrushColor}
-				brushSize={brushSize}
-				setBrushSize={setBrushSize}
-				brushShape={brushShape}
-				setBrushShape={setBrushShape}
-				textStyle={textStyle}
-				setTextStyle={setTextStyle}
-			/>
-			<canvas
-				aria-label='canvas'
-				ref={canvasRef}
-				width={1800}
-				height={1000}
-				onPointerDown={startInteraction}
-				onPointerMove={(e) => {
-					interact(e);
-					updateMousePosition(e);
-				}}
-				onPointerUp={stopInteraction}
-				onPointerLeave={stopInteraction}
-				style={{ touchAction: 'none' }} // prevents default touch behaviors
-				className='cursor-crosshair border border-gray-300'
-			/>
-
-			<button onClick={handleGetOnboardingData}> get onboardingData</button>
-
-			{isLogging && (
-				<div
-					style={{
-						position: 'fixed',
-						left: mousePos.x,
-						top: mousePos.y,
-						background: 'black',
-						color: 'white',
-						padding: '4px 8px',
-						borderRadius: '4px',
-						pointerEvents: 'none',
+		<>
+			<div className='flex relative'>
+				<Menu />
+				<CanvasBar
+					setSelectedElement={setSelectedElement}
+					selectedElement={selectedElement}
+					clearCanvas={clearCanvas}
+					isLogging={isLogging}
+					setIsLogging={setIsLogging}
+				/>
+				<CanvasSideBar
+					selectedElement={selectedElement}
+					brushColor={brushColor}
+					setBrushColor={setBrushColor}
+					brushSize={brushSize}
+					setBrushSize={setBrushSize}
+					brushShape={brushShape}
+					setBrushShape={setBrushShape}
+					textStyle={textStyle}
+					setTextStyle={setTextStyle}
+				/>
+				<canvas
+					aria-label='canvas'
+					ref={canvasRef}
+					width={1800}
+					height={1000}
+					onPointerDown={startInteraction}
+					onPointerMove={(e) => {
+						interact(e);
+						updateMousePosition(e);
 					}}
-				>
-					x: {mousePos.x}, y: {mousePos.y}
-				</div>
-			)}
-		</div>
+					onPointerUp={stopInteraction}
+					onPointerLeave={stopInteraction}
+					style={{ touchAction: 'none' }} // prevents default touch behaviors
+					// todo custom cursors based on tools
+					className='cursor-crosshair border border-gray-300'
+				/>
+
+				{/* <button onClick={handleGetOnboardingData}> get onboardingData</button> */}
+
+				{isLogging && (
+					<div
+						style={{
+							position: 'fixed',
+							left: mousePos.x,
+							top: mousePos.y,
+							background: 'black',
+							color: 'white',
+							padding: '4px 8px',
+							borderRadius: '4px',
+							pointerEvents: 'none',
+						}}
+					>
+						x: {mousePos.x}, y: {mousePos.y}
+					</div>
+				)}
+			</div>
+		</>
 	);
 }

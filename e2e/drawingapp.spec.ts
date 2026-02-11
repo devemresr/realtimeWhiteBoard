@@ -21,15 +21,15 @@ test.beforeEach(async ({ page }) => {
 	// Wait for the page to be ready (optional but recommended)
 	await page.waitForLoadState('networkidle');
 	await expect(page.getByTitle('isConnected')).not.toContainText(
-		'didnt connect'
+		'didnt connect',
 	);
 });
 
 let index = 0;
 const pages: Page[] = [];
 test('random drawings', async ({ browser }) => {
-	for (let i = 0; i < 1; i++) {
-		for (let a = 0; a < 2; a++) {
+	for (let i = 0; i < 3; i++) {
+		for (let a = 0; a < 3; a++) {
 			const windowPositionsX = a * 400;
 			const windowPositionsY = i * 300;
 			const windowPosition = `${windowPositionsX},${windowPositionsY}`;

@@ -9,6 +9,9 @@ recall.txt
 client/.next/
 client/out/
 accounts.txt
+dump.rdb
+
+/client/mocks
 
 # Playwright
 /test-results/

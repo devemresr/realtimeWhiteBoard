@@ -27,7 +27,7 @@ class SocketController {
 		io: Server,
 		redis: Redis,
 		redisStreamManager: RedisStreamManager,
-		tokenBucketManager: TokenBucketManager
+		tokenBucketManager: TokenBucketManager,
 	) {
 		this.io = io;
 		this.redis = redis;
@@ -84,7 +84,7 @@ class SocketController {
 	private async handleRedisStreamWriteUp(
 		socket: Socket,
 		messageData: any,
-		callback?: Function
+		callback?: Function,
 	) {
 		try {
 			console.log('messageDat a in handleRedisStreamWriteUp ', messageData);
@@ -101,7 +101,7 @@ class SocketController {
 		} catch (error) {
 			console.error(
 				'Error in handleRedisStreamWriteUp:',
-				(error as Error).message
+				(error as Error).message,
 			);
 			if (callback) {
 				callback({ success: false, error: (error as Error).message });
@@ -146,6 +146,7 @@ class SocketController {
 			// 	},
 			// 	delayOrNot ? delay : 1
 			// );
+
 			this.io
 				.to(roomId)
 				.except(originalSocketId)
@@ -155,7 +156,7 @@ class SocketController {
 		} catch (error) {
 			console.error(
 				`Error in broadcasting to the room ${roomId ?? 'unknown'}:`,
-				error
+				error,
 			);
 		}
 	}

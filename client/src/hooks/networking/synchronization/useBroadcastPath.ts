@@ -1,19 +1,26 @@
 import { useCallback } from 'react';
-import { Point, StrokePacket } from '@/types';
+import { Packet, PacketStatus } from '@/types';
 import logger from '../../../util/logger';
 import { useReceivedPacketManager } from '../packets/useReceivedPacketManager';
 import { useGapHandler } from './useGapHandler';
-import { useCanvasState } from '../../canvas/state/useCanvasState';
+import {
+	StoreStrokeInterpolatedPointsFn,
+	useCanvasState,
+} from '../../canvas/state/useCanvasState';
+import {
+	DrawDotOnCanvasFn,
+	DrawIncrementalPathFn,
+} from '../../canvas/drawing/useCanvasDrawing';
 
-export type DrawBroadcastPathFn = (packet: StrokePacket) => void;
+export type DrawBroadcastPathFn = (packet: Packet) => void;
+export type HandleGapFilledFn = (packet: Packet, sequence: number) => void;
+export type HandleGapPermanentFn = (packet: Packet, sequence: number) => void;
 
 export const useBroadcastRenderer = (
-	canvasData: ReturnType<typeof useCanvasState>,
-	drawIncrementalPath: (
-		contextPoints: Point[],
-		toBeDrawnPoints: Point[]
-	) => void,
-	drawDotOnCanvas: (point: Point) => void
+	canvasState: ReturnType<typeof useCanvasState>,
+	drawIncrementalPath: DrawIncrementalPathFn,
+	storeIntorPolatedDrawingPoints: StoreStrokeInterpolatedPointsFn,
+	drawDotOnCanvas: DrawDotOnCanvasFn,
 ) => {
 	const receivedPacketManager = useReceivedPacketManager();
 
@@ -23,14 +30,13 @@ export const useBroadcastRenderer = (
 			let delay = 0;
 			for (let attempt = 1; attempt <= maxRetries; attempt++) {
 				try {
-					console.log('test attempt: ', attempt);
 					// todo hook the actual api
 					const response = await fetch(
 						`/api/strokes/${strokeId}/packets/${sequence}`,
 						{
 							method: 'GET',
 							headers: { 'Content-Type': 'application/json' },
-						}
+						},
 					);
 
 					if (response.ok) {
@@ -57,12 +63,13 @@ export const useBroadcastRenderer = (
 				}
 			}
 		},
-		[]
+		[],
 	);
 
 	// Handle when gap is filled (packet arrives or fetched)
-	const handleGapFilled = useCallback(
-		(strokeId: string, sequence: number) => {
+	const handleGapFilled: HandleGapFilledFn = useCallback(
+		(packet: Packet, sequence: number) => {
+			const strokeId = packet.strokeId;
 			const situation =
 				receivedPacketManager.packetSituations.current.get(strokeId);
 			if (!situation) return;
@@ -74,17 +81,18 @@ export const useBroadcastRenderer = (
 
 			// Try to drain sequential packets
 			if (situation.expectedPacketSequenceNumber === sequence) {
-				drainSequentialPackets(situation, strokeId);
+				drainSequentialPackets(situation, packet);
 			}
 
 			receivedPacketManager.packetSituations.current.set(strokeId, situation);
 		},
-		[receivedPacketManager]
+		[receivedPacketManager],
 	);
 
 	// Handle when gap becomes permanent
-	const handleGapPermanent = useCallback(
-		(strokeId: string, sequence: number) => {
+	const handleGapPermanent: HandleGapPermanentFn = useCallback(
+		(packet, sequence: number) => {
+			const strokeId = packet.strokeId;
 			logger.warn('Gap declared permanent', { strokeId, sequence });
 
 			receivedPacketManager.markGapAsPermanent(strokeId, sequence);
@@ -104,68 +112,31 @@ export const useBroadcastRenderer = (
 				});
 			}
 		},
-		[receivedPacketManager]
+		[receivedPacketManager],
 	);
 
 	const gapHandler = useGapHandler({
 		apiCallTimeout: 300,
 		permanentTimeout: 1500,
-		onGapFilled: handleGapFilled,
-		onGapPermanent: handleGapPermanent,
+		handleGapFilled,
+		handleGapPermanent,
 		fetchPacket,
 	});
 
-	const renderPoints = useCallback(
-		(
-			strokeId: string,
-			packetId: string,
-			packetSequenceNumber: number,
-			isLastPacket: boolean
-		): void => {
-			const toBeDrawnPoints = canvasData.getPoints(strokeId, packetId);
-			const oldpacketId = `${strokeId}-${packetSequenceNumber - 1}`;
-			const latestPacketPoints =
-				packetSequenceNumber !== 1
-					? canvasData.getPoints(strokeId, oldpacketId)
-					: [];
-
-			if (toBeDrawnPoints.length === 0 && !isLastPacket) {
-				logger.warn('Cannot render: points not found', { strokeId, packetId });
-				return;
-			}
-
-			if (toBeDrawnPoints.length >= 2) {
-				logger.debug('Rendering path', {
-					strokeId,
-					packetSequenceNumber,
-					pointCount: toBeDrawnPoints.length,
-				});
-				drawIncrementalPath(latestPacketPoints, toBeDrawnPoints);
-			} else if (toBeDrawnPoints.length === 1) {
-				logger.debug('Rendering single point', { strokeId });
-				drawDotOnCanvas(toBeDrawnPoints[0]);
-			}
-		},
-		[canvasData, drawIncrementalPath, drawDotOnCanvas]
-	);
-
 	const drainSequentialPackets = useCallback(
-		(situation: any, strokeId: string) => {
+		(situation: any, packet: Packet) => {
 			let currentSeq = situation.lastRenderedSequence + 1;
 
 			logger.debug('Draining sequential packets', {
-				strokeId,
+				strokeId: packet.strokeId,
 				startingFrom: currentSeq,
 				receivedPacketIds: Array.from(situation.receivedPacketIds),
 			});
 
 			// Keep rendering while we have consecutive sequential packets
 			while (situation.receivedPacketIds.has(currentSeq)) {
-				const packetId = `${strokeId}-${currentSeq}`;
-				const isLastPacket = currentSeq === situation.lastPacketSequenceNumber;
-
-				renderPoints(strokeId, packetId, currentSeq, isLastPacket);
-
+				const previousPacket = canvasState.getPreviousPacket(packet);
+				drawIncrementalPath(previousPacket, packet);
 				situation.lastRenderedSequence = currentSeq;
 				currentSeq++;
 			}
@@ -177,17 +148,17 @@ export const useBroadcastRenderer = (
 			situation.holdRendering = situation.missingPacketIds.size > 0;
 
 			logger.debug('Drain complete', {
-				strokeId,
+				strokeId: packet.strokeId,
 				lastRendered: situation.lastRenderedSequence,
 				nextExpected: situation.expectedPacketSequenceNumber,
 				stillHolding: situation.holdRendering,
 			});
 		},
-		[renderPoints]
+		[],
 	);
 
 	const drawBroadcastPath: DrawBroadcastPathFn = useCallback(
-		(packet: StrokePacket) => {
+		(packet: Packet) => {
 			try {
 				const {
 					strokeId,
@@ -196,7 +167,6 @@ export const useBroadcastRenderer = (
 					points,
 					isLastPacket,
 				} = packet;
-				console.log('packet', packet);
 
 				const isFirstPacket = packetSequenceNumber === 1;
 				logger.debug('Processing broadcast packet', {
@@ -208,14 +178,16 @@ export const useBroadcastRenderer = (
 					isLastPacket,
 				});
 
-				// Store the points
-				canvasData.storePacket(packet);
+				canvasState.storePacket({
+					...packet,
+					status: PacketStatus.CREATED,
+				});
 
 				// Update packet tracking
 				const situation = receivedPacketManager.updateSituation(
 					strokeId,
 					packetSequenceNumber,
-					isLastPacket
+					isLastPacket,
 				);
 
 				// Check if out of order
@@ -228,19 +200,19 @@ export const useBroadcastRenderer = (
 
 					receivedPacketManager.detectMissingPackets(
 						situation,
-						packetSequenceNumber
+						packetSequenceNumber,
 					);
 
 					// Update highest sequence - used as starting point for gap detection
 					situation.highestPacketSequenceNumber = Math.max(
 						packetSequenceNumber,
-						situation.highestPacketSequenceNumber
+						situation.highestPacketSequenceNumber,
 					);
 
 					// Start timers for newly detected gaps
 					situation.missingPacketIds.forEach((seq) => {
 						if (!previousMissing.has(seq)) {
-							gapHandler.startGapTimeout(strokeId, seq);
+							gapHandler.startGapTimeout(packet, seq);
 						}
 					});
 				}
@@ -265,7 +237,7 @@ export const useBroadcastRenderer = (
 				if (isExpectedPacket) {
 					// Got the packet we were waiting for - drain sequential
 					situation.holdRendering = false;
-					drainSequentialPackets(situation, strokeId);
+					drainSequentialPackets(situation, packet);
 				} else {
 					// Out of order and not what we're waiting for
 					situation.holdRendering = true;
@@ -287,7 +259,7 @@ export const useBroadcastRenderer = (
 				});
 			}
 		},
-		[receivedPacketManager, gapHandler, drainSequentialPackets]
+		[receivedPacketManager, gapHandler, drainSequentialPackets],
 	);
 
 	return {
