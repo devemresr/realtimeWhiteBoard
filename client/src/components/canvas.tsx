@@ -19,7 +19,7 @@ import { useCanvasState } from '../hooks/canvas/state/useCanvasState';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
 import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 import { useDrawTool } from '../hooks/useDrawTool';
-
+import { canvasBarItems, cursors } from './config';
 interface ChildComponentProps {
 	socket: Socket | null;
 }
@@ -45,7 +45,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { drawBroadcastPath } = useBroadcastRenderer(
 		canvasState,
 		drawIncrementalPath,
-		drawDotOnCanvas
+		drawDotOnCanvas,
 	);
 
 	const { analytics } = useSocketSubscription(socket, drawBroadcastPath);
@@ -66,7 +66,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		() => ({
 			draw: drawTool,
 		}),
-		[drawTool]
+		[drawTool],
 	);
 
 	const getOnboardingDataQuerry = useGetOnboardingData();
@@ -74,7 +74,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	// hook to get onboarding data
 	const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
 		drawBroadcastPath,
-		getOnboardingDataQuerry
+		getOnboardingDataQuerry,
 	);
 
 	// Handler for onboarding button
@@ -89,7 +89,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				logger.error('Failed to load onboarding data', error);
 			}
 		},
-		[loadOnboardingData]
+		[loadOnboardingData],
 	);
 
 	const startInteraction = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -106,9 +106,18 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		const currentTool = tools[selectedElement];
 		currentTool?.endInteraction?.();
 	};
-
+	const cursor = canvasBarItems.find(
+		(item) => item.key === selectedElement,
+	).cursor;
 	return (
 		<div className=' flex relative'>
+			<style>
+				{` /* Apply custom cursor to canvas */
+          canvas {
+            cursor: ${cursors[cursor]}, auto;
+          }
+        `}
+			</style>
 			<Menu />
 			<CanvasBar
 				setSelectedElement={setSelectedElement}
@@ -141,7 +150,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				onPointerUp={stopInteraction}
 				onPointerLeave={stopInteraction}
 				style={{ touchAction: 'none' }} // prevents default touch behaviors
-				className='cursor-crosshair border border-gray-300'
+				className={`border border-gray-300 `} //${cursor}
 			/>
 
 			<button onClick={handleGetOnboardingData}> get onboardingData</button>

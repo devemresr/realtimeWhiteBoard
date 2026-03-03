@@ -1,19 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-	EraserSVG,
-	HandSVG,
-	ImageSVG,
-	LineSVG,
-	PaintSVG,
-	PenSVG,
-	PointerSVG,
-	StarSVG,
-	TextSVG,
-	TrashSVG,
-} from '../constants/svgs';
-import { CanvasBarItem } from './types';
-
-const color = '#2f2f2f';
+import { canvasBarItems } from './config';
 
 export default function CanvasBar({
 	setSelectedElement,
@@ -22,50 +8,66 @@ export default function CanvasBar({
 	isLogging,
 	setIsLogging,
 }) {
-	const canvasBarItems: CanvasBarItem[] = [
-		{ key: 'drag', icon: <HandSVG color={color} /> },
-		{ key: 'pointer', icon: <PointerSVG color={color} /> },
-		{ key: 'draw', icon: <PenSVG color={color} /> },
-		{ key: 'paint', icon: <PaintSVG color={color} /> },
-		{ key: 'erase', icon: <EraserSVG color={color} /> },
-		{ key: 'shape', icon: <StarSVG color={color} /> },
-		{ key: 'text', icon: <TextSVG color={color} /> },
-		{ key: 'line', icon: <LineSVG color={color} /> },
-		{ key: 'image', icon: <ImageSVG color={color} /> },
-		{ key: 'clear', icon: <TrashSVG color={color} />, handler: clearCanvas },
-	];
+	const items = canvasBarItems;
+	const handlers = { clear: clearCanvas };
+	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			const key = e.key;
 			if (key >= '1' && key <= '9') {
+				if (timeoutRef.current) {
+					clearTimeout(timeoutRef.current);
+					timeoutRef.current = null;
+				}
 				const index = parseInt(key, 10) - 1;
-				if (canvasBarItems[index]) {
-					setSelectedElement(canvasBarItems[index].key);
-					if (canvasBarItems[index].handler) {
-						canvasBarItems[index].handler();
+				if (items[index]) {
+					const selectedKey = items[index].key;
+					setSelectedElement(selectedKey);
+					if (handlers[selectedKey]) {
+						handlers[selectedKey]();
 					}
 				}
 				return;
-			}
-			if (key === '0') {
-				const lastIndex = canvasBarItems.length - 1;
-				if (canvasBarItems[lastIndex]) {
-					setSelectedElement(canvasBarItems[lastIndex].key);
-					canvasBarItems[lastIndex].handler();
+			} else if (key === '0') {
+				const lastIndex = items.length - 1;
+				if (items[lastIndex]) {
+					const selectedKey = items[lastIndex].key;
+					setSelectedElement(selectedKey);
+					handlers[selectedKey]();
+					timeoutRef.current = setTimeout(() => {
+						setSelectedElement('pointer');
+						timeoutRef.current = null;
+					}, 250);
 				}
 			}
 		};
 		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [canvasBarItems, setSelectedElement]);
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
+			if (timeoutRef.current) {
+				clearTimeout(timeoutRef.current);
+			}
+		};
+	}, [items, setSelectedElement]);
 
 	return (
 		<div className='container bg-white max-w-max border rounded-lg border-gray-200 p-1 fixed shadow left-1/2 -translate-x-1/2 top-2 flex gap-1'>
-			{canvasBarItems.map((item, index) => {
+			{items.map((item, index) => {
 				const handleElementSelection = () => {
-					setSelectedElement(item.key);
-					if (item.handler) {
-						item.handler();
+					const selectedKey = item.key;
+					if (timeoutRef.current) {
+						clearTimeout(timeoutRef.current);
+						timeoutRef.current = null;
+					}
+					setSelectedElement(selectedKey);
+					if (handlers[selectedKey]) {
+						handlers[selectedKey]();
+					}
+					if (selectedKey === 'clear') {
+						timeoutRef.current = setTimeout(() => {
+							setSelectedElement('pointer');
+							timeoutRef.current = null;
+						}, 250);
 					}
 				};
 				return (

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import type { ReactNode } from 'react';
 import { createElement, useState } from 'react';
+import { cursors } from '../components/config';
 // todo change the devtools to be hidden in prod
 // const ReactQueryDevtoolsProduction = React.lazy(() =>
 // 	import('@tanstack/react-query-devtools/production').then((d) => ({
@@ -21,12 +22,28 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 						staleTime: 60 * 1000, // 1 minute
 					},
 				},
-			})
+			}),
 	);
 
 	return (
 		<html lang='en'>
 			<body>
+				<style>
+					{` /* Apply custom cursor globally and for all states */
+					button *, a *, .hover * {
+					  cursor: inherit !important;
+					}
+          html, body, *, button, a, input,
+          .disabled, a:disabled, input:disabled {
+            cursor: ${cursors['cursor-default']}, auto;
+          }
+          button:hover, a:hover, input:hover, .hover:hover {
+            cursor: ${cursors['cursor-hand-pointing']}, auto;
+          }
+          button:active, a:active, input:active, .focus:active {
+            cursor: ${cursors['cursor-hand-grabbing']}, auto;
+          }`}
+				</style>
 				<QueryClientProvider client={queryClient}>
 					{children}
 					{process.env.NEXT_PUBLIC_ENVIRONMENT === 'development' &&
