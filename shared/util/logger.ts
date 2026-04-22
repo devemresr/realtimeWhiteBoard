@@ -1,6 +1,6 @@
 import pino from 'pino';
 
-const isDev = process.env.ENVIRONMENT !== 'production';
+const isDev = process.env.NODE_ENV !== 'production';
 
 const logger = pino({
 	level: process.env.LOG_LEVEL || (isDev ? 'debug' : 'info'),
@@ -19,16 +19,15 @@ const logger = pino({
 	}),
 
 	...(!isDev && {
-		base: undefined,
-		timestamp: pino.stdTimeFunctions.isoTime, // More efficient than custom function
-		formatters: {
-			level: (label) => ({ level: label }),
-		},
+		base: { pid: false, hostname: false },
+		timestamp: pino.stdTimeFunctions.isoTime,
+		formatters: { level: (label) => ({ level: label }) },
 	}),
 
 	// Add error serialization for better error logging
+	redact: ['req.headers.authorization', 'req.headers.cookie'],
 	serializers: {
-		error: pino.stdSerializers.err,
+		err: pino.stdSerializers.err,
 	},
 });
 
