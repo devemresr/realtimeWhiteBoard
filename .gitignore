@@ -2,6 +2,9 @@
 node_modules
 server/.env
 client/.env
+.env.local
+.env.production
+client/.env.production
 todo.txt
 devblog.txt
 recall.txt
