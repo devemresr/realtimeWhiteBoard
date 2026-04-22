@@ -1,10 +1,12 @@
 import { ToolType } from '@/types';
 import { JSX } from 'react';
+import { CursorType } from './config';
 
 export type CanvasBarItem = {
 	key: ToolType;
 	icon: JSX.Element;
 	handler?: () => void;
+	cursor?: CursorType;
 };
 
 export type CanvasShapeKeys = 'square' | 'triangle' | 'circle' | 'star';

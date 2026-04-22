@@ -49,7 +49,8 @@ export type ToolType =
 	| 'shape'
 	| 'text'
 	| 'line'
-	| 'image';
+	| 'image'
+	| 'clear';
 
 /**
  * Map of tool types to their handlers

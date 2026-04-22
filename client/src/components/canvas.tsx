@@ -21,7 +21,7 @@ import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
 import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
 import { useEraserManager } from '../hooks/canvas/drawing/useEraserManager';
 import { useCollisionDetection } from '../hooks/useCollisionDetection';
-
+import { canvasBarItems, cursors } from './config';
 interface ChildComponentProps {
 	socket: Socket | null;
 }
@@ -67,7 +67,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		canvasState,
 		drawIncrementalPath,
 		storeStrokeInterpolatedPoints,
-		drawDotOnCanvas,
+		drawDotOnCanvas,,
 	);
 
 	const { analytics } = useSocketSubscription(socket, drawBroadcastPath);
@@ -114,7 +114,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 			draw: drawTool,
 			erase: eraserTool,
 		}),
-		[drawTool],
+		[drawTool],,
 	);
 
 	const getOnboardingDataQuerry = useGetOnboardingData();
@@ -122,7 +122,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	// hook to get onboarding data
 	// const { loadOnboardsingData, isLoading, isError } = useOnboardingSync(
 	// 	drawBroadcastPath,
-	// 	getOnboardingDataQuerry,
+	// 	getOnboardingDataQuerry,,
 	// );
 
 	// // Handler for onboarding button
@@ -154,45 +154,52 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		const currentTool = tools[selectedElement];
 		currentTool?.endInteraction?.();
 	};
-
+	const cursor = canvasBarItems.find(
+		(item) => item.key === selectedElement,
+	).cursor;
 	return (
-		<>
-			<div className='flex relative'>
-				<Menu />
-				<CanvasBar
-					setSelectedElement={setSelectedElement}
-					selectedElement={selectedElement}
-					clearCanvas={clearCanvas}
-					isLogging={isLogging}
-					setIsLogging={setIsLogging}
-				/>
-				<CanvasSideBar
-					selectedElement={selectedElement}
-					brushColor={brushColor}
-					setBrushColor={setBrushColor}
-					brushSize={brushSize}
-					setBrushSize={setBrushSize}
-					brushShape={brushShape}
-					setBrushShape={setBrushShape}
-					textStyle={textStyle}
-					setTextStyle={setTextStyle}
-				/>
-				<canvas
-					aria-label='canvas'
-					ref={canvasRef}
-					width={1800}
-					height={1000}
-					onPointerDown={startInteraction}
-					onPointerMove={(e) => {
-						interact(e);
-						updateMousePosition(e);
-					}}
-					onPointerUp={stopInteraction}
-					onPointerLeave={stopInteraction}
-					style={{ touchAction: 'none' }} // prevents default touch behaviors
-					// todo custom cursors based on tools
-					className='cursor-crosshair border border-gray-300'
-				/>
+		<div className=' flex relative'>
+			<style>
+				{` /* Apply custom cursor to canvas */
+          canvas {
+            cursor: ${cursors[cursor]}, auto;
+          }
+        `}
+			</style>
+			<Menu />
+			<CanvasBar
+				setSelectedElement={setSelectedElement}
+				selectedElement={selectedElement}
+				clearCanvas={clearCanvas}
+				isLogging={isLogging}
+				setIsLogging={setIsLogging}
+			/>
+			<CanvasSideBar
+				selectedElement={selectedElement}
+				brushColor={brushColor}
+				setBrushColor={setBrushColor}
+				brushSize={brushSize}
+				setBrushSize={setBrushSize}
+				brushShape={brushShape}
+				setBrushShape={setBrushShape}
+				textStyle={textStyle}
+				setTextStyle={setTextStyle}
+			/>
+			<canvas
+				aria-label='canvas'
+				ref={canvasRef}
+				width={1800}
+				height={1000}
+				onPointerDown={startInteraction}
+				onPointerMove={(e) => {
+					interact(e);
+					updateMousePosition(e);
+				}}
+				onPointerUp={stopInteraction}
+				onPointerLeave={stopInteraction}
+				style={{ touchAction: 'none' }} // prevents default touch behaviors
+				className={`border border-gray-300 `} //${cursor}
+			/>
 
 				{/* <button onClick={handleGetOnboardingData}> get onboardingData</button> */}
 
