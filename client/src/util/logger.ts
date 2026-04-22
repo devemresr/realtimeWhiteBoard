@@ -11,8 +11,7 @@ class Logger {
 	private verbose: boolean;
 
 	constructor(options: LoggerOptions = {}) {
-		this.env =
-			options.env || process.env.NEXT_PUBLIC_ENVIRONMENT || 'development';
+		this.env = options.env || process.env.NODE_ENV || 'development';
 		this.enabled = this.env === 'development' || this.env === 'dev';
 		this.verbose = options.verbose !== undefined ? options.verbose : true;
 	}
@@ -35,7 +34,7 @@ class Logger {
 		const functionName = functionMatch
 			? functionMatch[1].substring(
 					functionMatch[1].indexOf('.') + 1,
-					functionMatch[1].length
+					functionMatch[1].length,
 				)
 			: 'anonymous';
 

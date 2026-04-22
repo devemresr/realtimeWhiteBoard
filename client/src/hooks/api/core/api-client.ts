@@ -21,7 +21,7 @@ type ApiFetchOptions = {
  */
 export async function apiFetch<TData>(
 	url: string,
-	options: ApiFetchOptions = {}
+	options: ApiFetchOptions = {},
 ): Promise<TData> {
 	const accessToken =
 		typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
@@ -37,11 +37,11 @@ export async function apiFetch<TData>(
 						acc[k] = String(v);
 						return acc;
 					},
-					{} as Record<string, string>
-				)
+					{} as Record<string, string>,
+				),
 			).toString();
 	}
-	const serverUrl = options.serverUrl ?? process.env.NEXT_PUBLIC_DEV_SERVER_URL;
+	const serverUrl = options.serverUrl ?? process.env.NEXT_PUBLIC_GATEWAY_URL;
 
 	if (!serverUrl) {
 		throw new Error('serverUrl is not defined');

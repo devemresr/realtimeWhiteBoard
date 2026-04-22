@@ -18,7 +18,7 @@ class TokenBucketManager {
 		this.redis = redis;
 		this.tokenBuckets = new Map();
 		this.config = {
-			// todo set actual limits
+			// todo replace these with actual limits
 			tokenCap: config?.tokenCap ?? 1000000,
 			refillRate: config?.refillRate ?? 2000,
 			cost: config?.cost ?? 1000,
@@ -26,7 +26,7 @@ class TokenBucketManager {
 		};
 	}
 
-	// todo add a userId parameter currently using socketid to test
+	// todo replace socketId with userId once auth is implemented
 	public getOrCreateBucket(socket: Socket): TokenBucket {
 		const userId = socket.data.userId || socket.id;
 
@@ -37,7 +37,7 @@ class TokenBucketManager {
 				this.config.tokenCap,
 				this.config.refillRate,
 				this.config.cost,
-				this.config.TTLforBuckets
+				this.config.TTLforBuckets,
 			);
 			this.tokenBuckets.set(userId, bucket);
 			console.log(`Created token bucket for user ${userId}`);
@@ -48,7 +48,7 @@ class TokenBucketManager {
 
 	public async removeBucket(
 		userId: string,
-		cleanupTTL?: number
+		cleanupTTL?: number,
 	): Promise<void> {
 		const bucket = this.tokenBuckets.get(userId);
 		if (bucket) {
@@ -60,7 +60,7 @@ class TokenBucketManager {
 
 	public async cleanupAllBuckets(): Promise<void> {
 		const promises = Array.from(this.tokenBuckets.entries()).map(
-			([userId, bucket]) => this.removeBucket(userId)
+			([userId, bucket]) => this.removeBucket(userId),
 		);
 		await Promise.all(promises);
 		console.log('All token buckets cleaned up');

@@ -7,20 +7,6 @@ import {
 	MessageSVG,
 	UserSVG,
 } from '../constants/svgs';
-const Parent = ({ menuOpen, children, setMenuOpen }) => {
-	if (menuOpen) {
-		return (
-			<div
-				className='fixed w-screen h-screen top-0 left-0 z-10'
-				style={{ backgroundColor: '#70707047' }}
-				onClick={() => setMenuOpen(false)}
-			>
-				{children}
-			</div>
-		);
-	}
-	return <>{children}</>;
-};
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const color = '#2f2f2f';
@@ -62,7 +48,14 @@ export default function Menu() {
 		},
 	];
 	return (
-		<Parent menuOpen={menuOpen} setMenuOpen={setMenuOpen}>
+		<>
+			{menuOpen && (
+				<div
+					className='fixed w-screen h-screen top-0 left-0 z-10'
+					style={{ backgroundColor: '#70707047' }}
+					onClick={() => setMenuOpen(false)}
+				></div>
+			)}
 			<button
 				onClick={() => setMenuOpen(!menuOpen)}
 				className={`w-8 h-8 bg-gray-100  shadow p-1.5 items-center justify-center rounded transition-colors hover:bg-purple-100 fixed left-2 top-2`}
@@ -89,6 +82,6 @@ export default function Menu() {
 					))}
 				</div>
 			)}
-		</Parent>
+		</>
 	);
 }

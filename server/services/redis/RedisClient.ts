@@ -26,7 +26,7 @@ export class RedisClient extends EventEmitter {
 				}
 				const delay = Math.min(times * 50, 500);
 				console.log(
-					`Redis retrying connection in ${delay}ms (attempt ${times})`
+					`Redis retrying connection in ${delay}ms (attempt ${times})`,
 				);
 				return delay; // Exponential backoff, max 500ms
 			},
@@ -111,7 +111,7 @@ export class RedisClient extends EventEmitter {
 			this.client.connect().catch((err) => {
 				console.error(
 					`[${this.redisClientName}] client.connect() threw error:`,
-					err
+					err,
 				);
 				onError(err);
 			});

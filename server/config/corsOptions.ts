@@ -1,20 +1,22 @@
+import logger from '@shared/util/logger';
 import allowedOrigins from './allowedOrigins';
 
 const corsOptions = {
 	origin: (
 		origin: string | undefined,
-		callback: (error: Error | null, allow?: boolean) => void
+		callback: (error: Error | null, allow?: boolean) => void,
 	) => {
-		console.log('Origin:', origin);
-		const timestamp = new Date().toISOString();
 		if (
-			(origin && allowedOrigins.indexOf(origin) !== -1) ||
-			// todo delete in prod
-			process.env.ENVIRONMENT === 'development'
+			!origin ||
+			(!origin && allowedOrigins.includes(origin)) ||
+			process.env.NODE_ENV === 'development'
 		) {
 			callback(null, true);
 		} else {
-			console.log('CORS error at', timestamp, 'for origin:', origin);
+			logger.error(
+				{ corsError: `${origin} isnt allowed`, allowedOrigins },
+				'CORS error',
+			);
 			callback(new Error('not allowed by CORS'));
 		}
 	},

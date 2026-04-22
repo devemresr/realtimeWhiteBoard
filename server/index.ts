@@ -4,21 +4,15 @@ import credentials from './config/credantials';
 import corsOptions from './config/corsOptions';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import path from 'path';
-import * as dotenv from 'dotenv';
-const __dirname = path.dirname(process.argv[1]);
-const envPath = path.resolve(__dirname, '../.env');
-dotenv.config({ path: envPath });
-import authRoutes from './routes/authRoutes';
+
 import mongoose from 'mongoose';
 import helmet from 'helmet';
 import { handleSanitization } from './middleware/handleSanitization';
 import { bootstrapApplication } from './bootstrapApplication';
-import { cloneElement } from 'react';
 
-const PORT = process.argv[2] || 3002;
 const app = express();
 const httpServer = createServer(app);
+const PORT = process.env.PORT || 3001;
 
 app.use(credentials);
 app.use(helmet());
@@ -28,7 +22,6 @@ app.set('trust proxy', 1);
 app.use(cors(corsOptions));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
-app.use('/auth', authRoutes);
 
 async function startServer() {
 	try {
@@ -41,13 +34,12 @@ async function startServer() {
 
 		await mongoose.connect(mongoUri);
 		console.log('MongoDB connected');
-		// clearAllCollections();
 
 		console.log('Bootstrapping application...');
-		await bootstrapApplication(httpServer, PORT.toString());
+		await bootstrapApplication(httpServer);
 
 		await new Promise((resolve) => {
-			httpServer.listen(parseInt(PORT.toString()), () => {
+			httpServer.listen(parseInt(PORT.toString()), '0.0.0.0', () => {
 				console.log('connected at port: ', PORT);
 				resolve(void 0);
 			});
@@ -61,23 +53,9 @@ async function startServer() {
 	}
 }
 
-async function clearAllCollections() {
-	const collections = await mongoose.connection.db.listCollections().toArray();
-	console.log('collections: ', collections);
-
-	for (const collectionInfo of collections) {
-		const collectionName = collectionInfo.name;
-		const collection = mongoose.connection.db.collection(collectionName);
-
-		await collection.deleteMany({});
-		console.log(`Cleared: ${collectionName}`);
-	}
-}
-
 // Graceful shutdown
 process.on('SIGINT', async () => {
 	try {
-		// todo add graceful shutdown
 		httpServer.close();
 		console.log('Graceful shutdown complete');
 	} catch (error) {

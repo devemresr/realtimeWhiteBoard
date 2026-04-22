@@ -22,10 +22,10 @@ export class SocketManager {
 			console.log('redis adapter init wip');
 
 			this.pubClient.on('error', (err: Error) =>
-				console.error('Redis adapter pub error:', err)
+				console.error('Redis adapter pub error:', err),
 			);
 			this.subClient.on('error', (err: Error) =>
-				console.error('Redis adapter sub error:', err)
+				console.error('Redis adapter sub error:', err),
 			);
 			// Connect the subClient
 			await this.subClient.connect();

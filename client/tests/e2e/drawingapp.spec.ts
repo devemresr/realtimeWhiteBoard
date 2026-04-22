@@ -1,9 +1,4 @@
-import test, {
-	type Page,
-	type Locator,
-	expect,
-	chromium,
-} from '@playwright/test';
+import test, { type Page, expect, chromium } from '@playwright/test';
 import { DrawingPatternMocker } from './utility/DrawingPatternMocker';
 
 // Usage function with proper typing
@@ -16,7 +11,7 @@ export async function mockDrawingSession(page: Page): Promise<void> {
 }
 
 test.beforeEach(async ({ page }) => {
-	await page.goto('http://localhost:3001/');
+	await page.goto(process.env.BASE_URL);
 
 	// Wait for the page to be ready (optional but recommended)
 	await page.waitForLoadState('networkidle');
@@ -41,7 +36,7 @@ test('random drawings', async ({ browser }) => {
 				viewport: { width: 400, height: 300 },
 			});
 			const page = await context.newPage();
-			await page.goto('http://localhost:3001/');
+			await page.goto(process.env.BASE_URL);
 			await page.evaluate(() => {
 				window.scrollBy(0, 160);
 			});

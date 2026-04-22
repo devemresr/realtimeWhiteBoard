@@ -1,6 +1,7 @@
 import Redis from 'ioredis';
-// import { addMessageWithInflightTracking } from '../scripts/addMessageWithInflightTracking';
-import { REDIS_STREAMS } from '../../shared/constants/socketIoConstants';
+import { RedisStream, REDIS_KEYS } from '@shared/constants/socketIoConstants';
+import { CanvasOperation } from '@/types';
+import { addToStreamAndDedup } from '../scripts/addToStreamAndDedup';
 
 interface StreamOptions {
 	maxLen?: number;
@@ -23,10 +24,11 @@ interface StreamMessage {
 class RedisStreamManager {
 	private redis: Redis | null = null;
 	private streamName: string | null = null;
+	private MESSAGE_KEY: keyof CanvasOperation = 'canvasMessageId';
 
 	constructor(redis: Redis) {
 		this.redis = redis;
-		this.streamName = REDIS_STREAMS.DRAWING_EVENTS;
+		this.streamName = RedisStream.DRAWING;
 	}
 
 	/**
@@ -38,70 +40,69 @@ class RedisStreamManager {
 	public async addMessageToStream(
 		data: any,
 		id: string = '*',
-		options: StreamOptions = {}
+		options: StreamOptions = {},
 	): Promise<string> {
 		if (!this.redis) {
 			throw new Error('Redis instance is undefined');
 		}
 
-		try {
-			// Convert object to redis appropriate string
-			// Build field-value pairs from data object
-			const fields = {
-				roomId: data.roomId,
-				strokeId: data.strokeId,
-				packetSequenceNumber: data.packetSequenceNumber,
-				strokeSequenceNumber: data.strokeSequenceNumber,
-				packetId: data.packetId,
-				originalSocketId: data.originalSocketId,
-				authorId: data.authorId,
-				points: JSON.stringify(data.points),
-				...(data.isLastPackage && { isLastPackage: data.isLastPackage }),
-			};
+		// Convert object to redis appropriate string
+		let args: string[] = ['*'];
 
-			// Convert to flat array of [key, value, key, value, ...]
-			const fieldValuePairs = Object.entries(fields).flatMap(([key, value]) => [
+		// MAXLEN options if needed
+		if (options.maxLen) {
+			args.push('MAXLEN');
+			if (options.approximate) {
+				args.push('~');
+			}
+			args.push(options.maxLen.toString());
+		}
+
+		let canvasMessageIds: string[] = [];
+		const fieldValuePairs = Object.entries(data).flatMap(([key, value]) => {
+			if (key === this.MESSAGE_KEY) {
+				canvasMessageIds.push(value as string);
+			}
+			return [
 				key,
-				String(value),
-			]);
-			let args: string[] = [];
-
-			// MAXLEN options if needed
-			if (options.maxLen) {
-				args.push('MAXLEN');
-				if (options.approximate) {
-					args.push('~');
-				}
-				args.push(options.maxLen.toString());
-			}
-
-			if (data.isLastPackage) {
-				args.push('isLastPackage', data.isLastPackage.toString());
-			}
-
-			const redisMessageId = await this.redis.xadd(
+				typeof value === 'object' && value !== null
+					? JSON.stringify(value)
+					: String(value ?? ''),
+			];
+		});
+		let redisMessageId: string | null;
+		try {
+			redisMessageId = (await this.redis.eval(
+				addToStreamAndDedup,
+				2,
 				this.streamName!,
-				'*',
+				REDIS_KEYS.dedupKey(this.streamName!),
+				JSON.stringify(canvasMessageIds),
 				...args,
-				...fieldValuePairs
-			);
-			console.log('redisMessageId', redisMessageId);
-
-			if (!redisMessageId) {
-				console.error('adding to the stream failed');
-				throw new Error(`failed messageId ${redisMessageId}`);
-			}
-
-			console.log(
-				`Message added to stream '${this.streamName}' with ID: ${redisMessageId}`
-			);
-
-			return redisMessageId as string;
+				...fieldValuePairs,
+			)) as string | null;
 		} catch (error) {
+			console.error('Stream write failed at Redis level', error);
 			throw new Error(
-				`Failed to add message to stream: ${(error as Error).message}`
+				`XADD failed: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}
+
+		if (redisMessageId === null) {
+			console.warn('Duplicate message detected, skipping', {
+				canvasMessageIds,
+			});
+			throw new Error(
+				`Duplicate message detected, skipping write: ${JSON.stringify(canvasMessageIds)}`,
+			);
+		}
+
+		console.log('fieldValuePairs', fieldValuePairs, 'args', args);
+		console.log(
+			`Message added to stream '${this.streamName}' with ID: ${redisMessageId}`,
+		);
+
+		return redisMessageId as string;
 	}
 
 	/**
@@ -113,7 +114,7 @@ class RedisStreamManager {
 	public async readMessages(
 		start: string = '0',
 		end: string = '+',
-		count: number = 100
+		count: number = 100,
 	): Promise<StreamMessage[]> {
 		if (!this.redis) {
 			throw new Error('Redis instance is undefined');
@@ -125,16 +126,16 @@ class RedisStreamManager {
 				start,
 				end,
 				'COUNT',
-				count
+				count,
 			);
 
 			return messages.map(([id, fields]) => ({
 				id,
-				data: this.arrayToObject(fields),
+				data: Object.fromEntries(this.toPairs(fields)),
 			}));
 		} catch (error) {
 			throw new Error(
-				`Failed to read messages from stream: ${(error as Error).message}`
+				`Failed to read messages from stream: ${(error as Error).message}`,
 			);
 		}
 	}
@@ -166,22 +167,20 @@ class RedisStreamManager {
 			return await this.redis.xlen(this.streamName!);
 		} catch (error) {
 			throw new Error(
-				`Failed to get stream length: ${(error as Error).message}`
+				`Failed to get stream length: ${(error as Error).message}`,
 			);
 		}
 	}
 
-	/**
-	 * Helper method to convert flat array to object
-	 */
-	private arrayToObject(arr: string[]): MessageData {
-		const obj: MessageData = {};
-		for (let i = 0; i < arr.length; i += 2) {
-			obj[arr[i]] = arr[i + 1];
+	private toPairs(flat: string[]): [string, string][] {
+		if (flat.length % 2 !== 0)
+			throw new Error(`Expected even-length fields array, got ${flat.length}`);
+		const pairs: [string, string][] = [];
+		for (let i = 0; i < flat.length; i += 2) {
+			pairs.push([flat[i]!, flat[i + 1]!]);
 		}
-		return obj;
+		return pairs;
 	}
-
 	/**
 	 * Close Redis connection
 	 */

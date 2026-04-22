@@ -1,0 +1,89 @@
+config:
+  # NOTE:
+  # We use 127.0.0.1 instead of localhost to force IPv4 resolution.
+  # This avoids Socket.IO connection issues caused by environments where
+  # 'localhost' resolves to IPv6 (::1), which may not match the server binding.
+  # Using IPv4 ensures consistent handshake behavior for WebSocket + polling
+  # during load testing and prevents silent connection failures (e.g. xhr poll errors).
+  target: 'http://127.0.0.1:3001'
+  phases:
+    - duration: 30
+      arrivalRate: 50
+      name: 'Low load'
+    - duration: 60
+      arrivalRate: 100
+      name: 'Medium load'
+    - duration: 60
+      arrivalRate: 150
+      name: 'High load'
+  socketio:
+    timeout: 30000
+    reconnection: true
+    reconnectionAttempts: 5
+    reconnectionDelay: 1000
+    # debug: true
+
+  defaults:
+    headers:
+      Connection: 'keep-alive'
+      User-Agent: 'Artillery-Test-{{ $uuid }}'
+
+scenarios:
+  - name: 'stressTest'
+    engine: socketio
+    flow:
+      - emit:
+          channel: 'room:join'
+          data: 'test'
+          acknowledge:
+            match:
+              json: '$.success'
+              value: true
+            timeout: 5000
+
+      - loop:
+          - emit:
+              channel: 'packet:send'
+              data:
+                strokes:
+                  [
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                    {
+                      x: '{{ $randomNumber(100, 900) }}',
+                      y: '{{ $randomNumber(50, 500) }}',
+                      timestamp: '{{ $timestamp }}',
+                    },
+                  ]
+                strokeSequenceNumber: '{{ $loopCount }}'
+                strokeId: '{{ $uuid }}'
+                category: 'drawing'
+                type: 'drawing'
+                packageSequenceNumber: '{{ $loopCount }}'
+                isLastPackage: false
+                roomId: 'room-{{ $randomNumber(1, 10) }}'
+              acknowledge:
+                match:
+                  json: '$.success'
+                  value: true
+                timeout: 5000
+          - think: 0.1
+        count: 10

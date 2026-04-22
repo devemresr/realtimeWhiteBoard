@@ -6,13 +6,14 @@ import {
 	CanvasPoint,
 	DrawingPoint,
 	EraserPoint,
-	Packet,
-	PacketType,
+	CanvasOperation,
+	CanvasOperationType,
+	CanvasOperationTypeToPoints,
 } from '@/types';
 import createInterpolator from '../../../util/drawing/interpolation';
 import logger from '../../../util/logger';
 
-export type DrawIncrementalPathFn = <T extends Packet>(
+export type DrawIncrementalPathFn = <T extends CanvasOperation>(
 	previousPacket: T,
 	currentPacket: T,
 ) => { interpolatedPoints: CanvasPoint[]; didInterpolated: boolean };
@@ -22,13 +23,24 @@ interface BrushOptions {
 	brushSize: number;
 }
 
-export type GetEnrichedInterpolatedPointsFn = <T extends Packet>(
-	previousPacket: T,
-	currentPacket: T,
-) => CanvasPoint[];
+export type GetEnrichedInterpolatedPointsFn = <
+	TType extends CanvasOperationType,
+	TPacket extends CanvasOperation & { type: TType },
+>(
+	previousPacket: TPacket,
+	currentPacket: TPacket,
+) => CanvasOperationTypeToPoints[TType][];
 
-export type DrawDotOnCanvasFn = (point: CanvasPoint, type: PacketType) => void;
-
+export type DrawDotOnCanvasFn = (
+	point: CanvasPoint,
+	type: CanvasOperationType,
+) => void;
+export type DrawPointsFn = (
+	points: CanvasPoint[],
+	type: CanvasOperationType,
+	brushColorOverride?: string,
+	brushSizeOverride?: number,
+) => void;
 const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 	const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const contextPropsRef = useRef({ brushColor: null, brushSize: null });
@@ -76,12 +88,12 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 			let pointBrushSize: number;
 
 			switch (type) {
-				case PacketType.DRAWING:
+				case CanvasOperationType.DRAWING:
 					const firstPoint = point as DrawingPoint;
 					pointBrushColor = firstPoint.brushColor;
 					pointBrushSize = firstPoint.brushSize;
 					break;
-				case PacketType.ERASER:
+				case CanvasOperationType.ERASER:
 					pointBrushColor = brushColor; // Use default for eraser
 					pointBrushSize = (point as EraserPoint).brushSize;
 					break;
@@ -109,10 +121,10 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 		return interpolated;
 	};
 
-	const drawInterpolatedPoints = useCallback(
+	const drawPoints = useCallback(
 		(
 			points: CanvasPoint[],
-			type: PacketType,
+			type: CanvasOperationType,
 			brushColorOverride?: string,
 			brushSizeOverride?: number,
 		) => {
@@ -126,12 +138,12 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 			let pointBrushSize: number;
 
 			switch (type) {
-				case PacketType.DRAWING:
+				case CanvasOperationType.DRAWING:
 					const firstPoint = points[0] as DrawingPoint;
 					pointBrushColor = brushColorOverride || firstPoint.brushColor;
 					pointBrushSize = brushSizeOverride || firstPoint.brushSize;
 					break;
-				case PacketType.ERASER:
+				case CanvasOperationType.ERASER:
 					pointBrushColor = brushColorOverride || brushColor;
 					pointBrushSize =
 						brushSizeOverride || (points[0] as EraserPoint).brushSize;
@@ -176,10 +188,10 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 	 * @param toBeDrawnPoints - New points to be interpolated and enriched
 	 * @returns Interpolated points with tool-specific properties preserved
 	 */
-	const enrichInterpolatedPoints = (
-		interpolatedPoints: CanvasPoint[],
-		pointToExtractProperities: CanvasPoint,
-	) => {
+	const enrichInterpolatedPoints = <TPoint extends CanvasPoint>(
+		interpolatedPoints: BasePoint[],
+		pointToExtractProperities: TPoint,
+	): TPoint[] => {
 		if (interpolatedPoints.length === 0) return [];
 
 		// Extract all properties except x, y from the first point
@@ -188,7 +200,7 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 		return interpolatedPoints.map((point) => ({
 			...point,
 			...additionalProps,
-		}));
+		})) as TPoint[];
 	};
 
 	/**
@@ -199,12 +211,14 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 	 * @param currentPacket - Current packet to be interpolated and enriched
 	 * @returns Enriched interpolated points ready for drawing
 	 */
-	const getEnrichedInterpolatedPoints: GetEnrichedInterpolatedPointsFn = <
-		T extends Packet,
+
+	const getEnrichedInterpolatedPoints = <
+		TType extends CanvasOperationType,
+		TPacket extends CanvasOperation & { type: TType },
 	>(
-		previousPacket: T,
-		currentPacket: T,
-	): CanvasPoint[] => {
+		previousPacket: TPacket,
+		currentPacket: TPacket,
+	): CanvasOperationTypeToPoints[TType][] => {
 		if (
 			!currentPacket ||
 			currentPacket?.points.length === 0 ||
@@ -220,12 +234,12 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 
 		const pointToExtractProperities = currentPacket.points[0];
 
-		const interpolatedPoints: CanvasPoint[] = enrichInterpolatedPoints(
+		const interpolatedPoints = enrichInterpolatedPoints(
 			baseInterpolatedPoints,
 			pointToExtractProperities,
 		);
 
-		return interpolatedPoints;
+		return interpolatedPoints as CanvasOperationTypeToPoints[TType][];
 	};
 
 	/**
@@ -240,7 +254,7 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 		previousPacket,
 		currentPacket,
 	) => {
-		const interpolatedPoints = getEnrichedInterpolatedPoints(
+		let interpolatedPoints = getEnrichedInterpolatedPoints(
 			previousPacket,
 			currentPacket,
 		);
@@ -250,24 +264,30 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 				interpolatedPoints.length;
 
 		logger.debug(
-			'interpolatedPoints:',
-			interpolatedPoints,
+			// 'interpolatedPoints:',
+			// interpolatedPoints,
 			'interpolatedPoints.length: ',
 			interpolatedPoints.length,
 			'previousPacket?.points.length: ',
 			previousPacket?.points.length,
+			// "previousPacket?.points",
+			// previousPacket?.points,
 			'currentPacket?.points.length: ',
 			currentPacket?.points.length,
+			// 'currentPacket?.points: ',
+			// currentPacket?.points,
 			'didInterpolated: ',
 			didInterpolated,
 		);
 
-		if (interpolatedPoints.length === 0) {
-			return { interpolatedPoints: [], didInterpolated: false };
-		}
-
 		const packetType = currentPacket?.type || previousPacket?.type;
-		drawInterpolatedPoints(interpolatedPoints, packetType);
+		if (!didInterpolated)
+			interpolatedPoints = [
+				...(previousPacket?.points ?? []),
+				...(currentPacket?.points ?? []),
+			];
+
+		drawPoints(interpolatedPoints, packetType);
 
 		return { interpolatedPoints, didInterpolated };
 	};
@@ -286,6 +306,7 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 		clearCanvas,
 		drawDotOnCanvas,
 		getInterpolatedPoints,
+		drawPoints,
 		getEnrichedInterpolatedPoints,
 		drawIncrementalPath,
 	};

@@ -4,15 +4,10 @@ import {
 	useCanvasState,
 } from '../state/useCanvasState';
 import { useRoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
-import {
-	DrawingPacket,
-	DrawingPoint,
-	PacketStatus,
-	PacketType,
-	ToolInstance,
-} from '@/types';
+import { DrawingOperation, DrawingPoint, CanvasOperationType } from '@/types';
+import { ToolInstance } from 'src/types/tool.types';
 import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
-import logger from '../../../util/logger';
+import { HandlePacketSendingFn } from '../../networking/packets/usePacketTransmitter';
 
 interface UseDrawToolProps {
 	brushColor: string;
@@ -21,7 +16,7 @@ interface UseDrawToolProps {
 	canvasState: ReturnType<typeof useCanvasState>;
 	drawDotOnCanvas: DrawDotOnCanvasFn;
 	drawIncrementalPath: DrawIncrementalPathFn;
-	handlePacketSending: () => boolean;
+	handlePacketSending: HandlePacketSendingFn;
 	storeStrokeInterpolatedPoints: StoreStrokeInterpolatedPointsFn;
 }
 
@@ -40,6 +35,7 @@ export const useDrawTool = ({
 
 	const startInteraction = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
+			if (e.button === 1) return; // block middle mouse button
 			const { offsetX, offsetY } = e.nativeEvent;
 
 			const pos: DrawingPoint = {
@@ -63,12 +59,7 @@ export const useDrawTool = ({
 			});
 			strokePointsRef.current = remainingPoints;
 
-			drawDotOnCanvas(pos, PacketType.DRAWING);
-
-			logger.debug(
-				'draw packet strokeId: ',
-				roomPacketBuilder.getCurrentStrokeId(),
-			);
+			drawDotOnCanvas(pos, CanvasOperationType.DRAWING);
 		},
 		[brushSize, brushColor, roomPacketBuilder, drawDotOnCanvas],
 	);
@@ -80,7 +71,11 @@ export const useDrawTool = ({
 			}
 
 			const nativeEvent = e.nativeEvent as any;
-			const events = nativeEvent.getCoalescedEvents?.() || [e.nativeEvent];
+			let events = nativeEvent.getCoalescedEvents?.();
+
+			if (!events?.length) {
+				events = [nativeEvent];
+			}
 
 			for (const event of events) {
 				const { offsetX, offsetY } = event;
@@ -111,7 +106,7 @@ export const useDrawTool = ({
 			handlePacketSending();
 
 			// Render packets locally
-			packets.forEach((packet: DrawingPacket) => {
+			packets.forEach((packet: DrawingOperation) => {
 				// Store the packets to map
 				canvasState.storePacket(packet);
 				const previousPacket = canvasState.getPreviousPacket(packet);
@@ -122,9 +117,9 @@ export const useDrawTool = ({
 				);
 
 				if (didInterpolated)
-					w(
+					storeStrokeInterpolatedPoints(
 						packet.strokeId,
-						packet.packetId,
+						packet.canvasMessageId,
 						interpolatedPoints as DrawingPoint[],
 					);
 			});
@@ -145,7 +140,7 @@ export const useDrawTool = ({
 
 		const packet = roomPacketBuilder.buildFinalPacket(
 			strokePointsRef.current,
-			PacketType.DRAWING,
+			CanvasOperationType.DRAWING,
 		);
 		canvasState.storePacket(packet);
 		handlePacketSending();
@@ -160,7 +155,7 @@ export const useDrawTool = ({
 		if (didInterpolated)
 			storeStrokeInterpolatedPoints(
 				packet.strokeId,
-				packet.packetId,
+				packet.canvasMessageId,
 				interpolatedPoints as DrawingPoint[],
 			);
 

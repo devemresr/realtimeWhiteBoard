@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-	EraserPacket,
+	EraseEvent,
+	EraserOperation,
 	EraserPoint,
-	Packet,
-	PacketStatus,
-	PacketType,
-	ToolInstance,
+	EventType,
+	CanvasOperationType,
+	MessageCategory,
 } from '@/types';
+import { ToolInstance } from 'src/types/tool.types';
 import { useEraserManager } from './useEraserManager';
 import logger from '../../../util/logger';
 import { useRoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
 import { useCanvasState } from '../state/useCanvasState';
-import { GetEnrichedInterpolatedPointsFn } from './useCanvasDrawing';
+import usePacketTransmitter from '../../networking/packets/usePacketTransmitter';
 
 interface UseEraserToolProps {
 	canvasRef;
@@ -19,8 +20,8 @@ interface UseEraserToolProps {
 	eraserSize: number;
 	eraserManager: ReturnType<typeof useEraserManager>;
 	roomPacketBuilder: ReturnType<typeof useRoomPacketBuilder>;
-	getEnrichedInterpolatedPoints: GetEnrichedInterpolatedPointsFn;
-	handlePacketSending: () => boolean;
+	getEnrichedInterpolatedPoints;
+	packetTransmitter: ReturnType<typeof usePacketTransmitter>;
 }
 
 export const useEraserTool = ({
@@ -30,7 +31,7 @@ export const useEraserTool = ({
 	eraserManager,
 	roomPacketBuilder,
 	getEnrichedInterpolatedPoints,
-	handlePacketSending,
+	packetTransmitter,
 }: UseEraserToolProps): ToolInstance => {
 	const setupContext = useCallback(() => {
 		if (!canvasRef.current || ctxRef.current) return;
@@ -50,8 +51,19 @@ export const useEraserTool = ({
 	const ctxRef = useRef(null);
 	const [isErasing, setIsErasing] = useState(false);
 	const eraserPathCache = useRef<EraserPoint[]>([]);
+	const { handlePacketSending } = packetTransmitter;
 
-	const { eraseAtPoint } = eraserManager;
+	const handleEraseEvents = (erasedStrokeIds: string[]) => {
+		if (erasedStrokeIds.length > 0) {
+			const EraseEvent: EraseEvent = {
+				erasedStrokeIds,
+				category: MessageCategory.EVENT,
+				type: EventType.ERASE,
+			};
+			logger.debug('EraseEvent: ', EraseEvent);
+			packetTransmitter.sendPacket(EraseEvent);
+		}
+	};
 
 	const startInteraction = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -74,12 +86,11 @@ export const useEraserTool = ({
 			roomPacketBuilder.buildEraserPackets([pos]);
 			handlePacketSending();
 
-			logger.debug('@ started Erasing at point: ', pos);
-			// Erase at starting point
-			const erasedStrokeIds = eraseAtPoint(pos, eraserSize);
-			logger.debug('@ erasedStrokeIds in start erasing: ', erasedStrokeIds);
+			// Erase at starting point (single point, no interpolation needed)
+			const erasedStrokeIds = eraserManager.eraseAtPoint(pos, eraserSize);
+			handleEraseEvents(erasedStrokeIds);
 		},
-		[eraserSize, eraseAtPoint, roomPacketBuilder],
+		[eraserSize, eraserManager, roomPacketBuilder, handlePacketSending],
 	);
 
 	const continueInteraction = useCallback(
@@ -111,24 +122,29 @@ export const useEraserTool = ({
 			// Send packages over network
 			handlePacketSending();
 
-			// Store the packets to map and run eraser functionality
-			packets.forEach((packet: EraserPacket) => {
-				// Store the packets to map
+			// Process each eraser packet with interpolation
+			packets.forEach((packet: EraserOperation) => {
 				const previousPacket = canvasState.getPreviousPacket(packet);
-				const interpolatedPoints = getEnrichedInterpolatedPoints(
+
+				// Get interpolated points for this eraser packet
+				const eraserInterpolatedPoints = getEnrichedInterpolatedPoints(
 					previousPacket,
 					packet,
 				);
 
-				interpolatedPoints.forEach((point: EraserPoint) => {
-					eraseAtPoint(point, eraserSize);
-				});
+				canvasState.storePacket(packet);
+
+				// Erase using the interpolated path
+				const erasedStrokeIds = eraserManager.eraseWithInterpolatedPath(
+					eraserInterpolatedPoints,
+					eraserSize,
+				);
+				handleEraseEvents(erasedStrokeIds);
 			});
 		},
 		[
 			isErasing,
 			eraserSize,
-			eraseAtPoint,
 			getEnrichedInterpolatedPoints,
 			handlePacketSending,
 			canvasState,
@@ -142,19 +158,32 @@ export const useEraserTool = ({
 
 		const packet = roomPacketBuilder.buildFinalPacket(
 			eraserPathCache.current,
-			PacketType.ERASER,
+			CanvasOperationType.ERASER,
 		);
-		packet.points.forEach((point: EraserPoint) => {
-			eraseAtPoint(point);
-		});
 
-		// canvasState.storePacket(packet);
+		// Erase at each remaining point
+		const previousPacket = canvasState.getPreviousPacket(packet);
+		const eraserInterpolatedPoints = getEnrichedInterpolatedPoints(
+			previousPacket,
+			packet,
+		);
+		const erasedStrokeIds = eraserManager.eraseWithInterpolatedPath(
+			eraserInterpolatedPoints,
+			eraserSize,
+		);
+		handleEraseEvents(erasedStrokeIds);
 
+		canvasState.storePacket(packet);
 		handlePacketSending();
-
 		eraserPathCache.current = [];
-	}, [isErasing, roomPacketBuilder, canvasState, handlePacketSending]);
-
+	}, [
+		isErasing,
+		eraserManager,
+		eraserSize,
+		roomPacketBuilder,
+		canvasState,
+		handlePacketSending,
+	]);
 	return {
 		startInteraction,
 		continueInteraction,

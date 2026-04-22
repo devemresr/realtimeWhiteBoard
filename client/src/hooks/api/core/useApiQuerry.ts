@@ -83,7 +83,7 @@ export default function useApiQuery<
 
 // Export helper for custom retry configs
 export const createRetryConfig = (
-	overrides?: Partial<RetryConfig>
+	overrides?: Partial<RetryConfig>,
 ): RetryConfig => ({
 	...DEFAULT_RETRY_CONFIG,
 	...overrides,

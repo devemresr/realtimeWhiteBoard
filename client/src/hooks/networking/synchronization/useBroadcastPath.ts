@@ -1,26 +1,17 @@
 import { useCallback } from 'react';
-import { Packet, PacketStatus } from '@/types';
+import { CanvasOperation, MessageStatus } from '@/types';
 import logger from '../../../util/logger';
 import { useReceivedPacketManager } from '../packets/useReceivedPacketManager';
 import { useGapHandler } from './useGapHandler';
-import {
-	StoreStrokeInterpolatedPointsFn,
-	useCanvasState,
-} from '../../canvas/state/useCanvasState';
-import {
-	DrawDotOnCanvasFn,
-	DrawIncrementalPathFn,
-} from '../../canvas/drawing/useCanvasDrawing';
+import { useCanvasState } from '../../canvas/state/useCanvasState';
+import { DrawIncrementalPathFn } from '../../canvas/drawing/useCanvasDrawing';
+import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
 
-export type DrawBroadcastPathFn = (packet: Packet) => void;
-export type HandleGapFilledFn = (packet: Packet, sequence: number) => void;
-export type HandleGapPermanentFn = (packet: Packet, sequence: number) => void;
+export type DrawBroadcastPathFn = (packet: CanvasOperation) => void;
 
 export const useBroadcastRenderer = (
 	canvasState: ReturnType<typeof useCanvasState>,
 	drawIncrementalPath: DrawIncrementalPathFn,
-	storeIntorPolatedDrawingPoints: StoreStrokeInterpolatedPointsFn,
-	drawDotOnCanvas: DrawDotOnCanvasFn,
 ) => {
 	const receivedPacketManager = useReceivedPacketManager();
 
@@ -44,7 +35,10 @@ export const useBroadcastRenderer = (
 					}
 
 					if (response.status === 404) {
-						logger.warn('Packet not found in backend', { strokeId, sequence });
+						logger.warn('CanvasOperation not found in backend', {
+							strokeId,
+							sequence,
+						});
 						delay = attempt * 300;
 						await new Promise((resolve) => setTimeout(resolve, delay));
 						continue;
@@ -68,7 +62,7 @@ export const useBroadcastRenderer = (
 
 	// Handle when gap is filled (packet arrives or fetched)
 	const handleGapFilled: HandleGapFilledFn = useCallback(
-		(packet: Packet, sequence: number) => {
+		(packet: CanvasOperation, sequence: number) => {
 			const strokeId = packet.strokeId;
 			const situation =
 				receivedPacketManager.packetSituations.current.get(strokeId);
@@ -124,7 +118,7 @@ export const useBroadcastRenderer = (
 	});
 
 	const drainSequentialPackets = useCallback(
-		(situation: any, packet: Packet) => {
+		(situation: any, packet: CanvasOperation) => {
 			let currentSeq = situation.lastRenderedSequence + 1;
 
 			logger.debug('Draining sequential packets', {
@@ -135,8 +129,23 @@ export const useBroadcastRenderer = (
 
 			// Keep rendering while we have consecutive sequential packets
 			while (situation.receivedPacketIds.has(currentSeq)) {
-				const previousPacket = canvasState.getPreviousPacket(packet);
-				drawIncrementalPath(previousPacket, packet);
+				const currentPacketId = `${packet.strokeId}-${currentSeq}`;
+				const currentPacket = canvasState.getPacket(
+					packet.strokeId,
+					currentPacketId,
+				);
+
+				const previousPacket = canvasState.getPreviousPacket(currentPacket);
+				const isFirstPacket = packet.packetSequenceNumber === 1;
+
+				if (!previousPacket && !isFirstPacket) {
+					logger.error('Expected previous packet but none found', {
+						strokeId: packet.strokeId,
+						packetSequenceNumber: packet.packetSequenceNumber,
+					});
+				} else {
+					drawIncrementalPath(previousPacket, currentPacket);
+				}
 				situation.lastRenderedSequence = currentSeq;
 				currentSeq++;
 			}
@@ -158,20 +167,21 @@ export const useBroadcastRenderer = (
 	);
 
 	const drawBroadcastPath: DrawBroadcastPathFn = useCallback(
-		(packet: Packet) => {
+		(packet: CanvasOperation) => {
 			try {
 				const {
 					strokeId,
-					packetId,
+					canvasMessageId,
 					packetSequenceNumber,
 					points,
 					isLastPacket,
+					status,
 				} = packet;
 
 				const isFirstPacket = packetSequenceNumber === 1;
 				logger.debug('Processing broadcast packet', {
 					strokeId,
-					packetId,
+					canvasMessageId,
 					packetSequenceNumber,
 					points,
 					isFirstPacket,
@@ -180,7 +190,7 @@ export const useBroadcastRenderer = (
 
 				canvasState.storePacket({
 					...packet,
-					status: PacketStatus.CREATED,
+					status: MessageStatus.RECEIVED,
 				});
 
 				// Update packet tracking
@@ -210,9 +220,9 @@ export const useBroadcastRenderer = (
 					);
 
 					// Start timers for newly detected gaps
-					situation.missingPacketIds.forEach((seq) => {
-						if (!previousMissing.has(seq)) {
-							gapHandler.startGapTimeout(packet, seq);
+					situation.missingPacketIds.forEach((sequence) => {
+						if (!previousMissing.has(sequence)) {
+							gapHandler.startGapTimeout(packet, sequence);
 						}
 					});
 				}
@@ -254,7 +264,7 @@ export const useBroadcastRenderer = (
 			} catch (error) {
 				logger.error('Failed to process broadcast packet', error, {
 					strokeId: packet.strokeId,
-					packetId: packet.packetId,
+					canvasMessageId: packet.canvasMessageId,
 					packetSequenceNumber: packet.packetSequenceNumber,
 				});
 			}

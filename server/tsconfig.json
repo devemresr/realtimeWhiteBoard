@@ -1,0 +1,28 @@
+{
+	"compilerOptions": {
+		"rootDir": "..",
+		"baseUrl": ".",
+		"outDir": "./dist",
+		"module": "node16",
+		"moduleResolution": "node16",
+		"target": "es2022",
+		"lib": ["es2022"],
+		"types": ["node"],
+		"sourceMap": true,
+		"declaration": true,
+		"declarationMap": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"strict": true,
+		"isolatedModules": true,
+		"moduleDetection": "force",
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"paths": {
+			"@/types": ["../shared/types"],
+			"@shared/*": ["../shared/*"]
+		}
+	},
+	"include": ["./**/*.ts", "../shared/**/*.ts"],
+	"exclude": ["node_modules", "dist", "../client"]
+}

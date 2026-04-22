@@ -1,4 +1,4 @@
-import { ToolType } from '@/types';
+import { ToolType } from 'src/types/tool.types';
 import { JSX } from 'react';
 import { CursorType } from './config';
 

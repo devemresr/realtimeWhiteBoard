@@ -1,28 +1,29 @@
 import { Server as SocketIOServer } from 'socket.io';
-import { Server as HttpServer } from 'http'; // or 'https'
-import allowedOrigins from './config/allowedOrigins';
+import { Server as HttpServer } from 'http';
 import SocketController from './controllers/socketController';
 import { instrument } from '@socket.io/admin-ui';
 import TokenBucketManager from './services/TokenBucketManager';
 import { RedisFactory } from './services/redis/RedisFactory';
-import { RedisClient } from './services/redis/RedisClient';
 import RedisStreamManager from './services/RedisStreamManager';
 import { SocketManager } from './controllers/socketManager';
-import { REDIS_CLIENTS } from '../shared/constants/socketIoConstants';
+import { RedisClients } from '@shared/constants/socketIoConstants';
+import mongoose from 'mongoose';
 
 export async function bootstrapApplication(
 	serverReference: HttpServer,
-	port: string,
 ): Promise<any> {
 	try {
 		// Initialize Socket.IO
 		console.log('Initializing Socket.IO');
 		const io = new SocketIOServer(serverReference, {
 			cors: {
-				origin: [...allowedOrigins],
+				// origin:
+				// 	process.env.NODE_ENV === 'development' ? true : [...allowedOrigins],
+				origin: true,
 				methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 				allowedHeaders: ['Content-Type'],
 				credentials: true,
+				// credentials true and origin * is not compatible with some browsers so we use true for allowing origins
 			},
 			transports: ['websocket', 'polling'],
 			allowEIO3: true,
@@ -30,12 +31,13 @@ export async function bootstrapApplication(
 		console.log('Socket.IO initialized');
 
 		// Initialize Redis Adapter
-		console.log('Initializing Redis Adapter');
+		console.log('Initializing Redis Adapter', process.env.REDIS_ADAPTER_PORT);
 		const redisAdapterInstance = await RedisFactory.createClient(
 			{
-				port: 6380,
+				host: process.env.REDIS_ADAPTER_HOST || 'localhost',
+				port: parseInt(process.env.REDIS_ADAPTER_PORT || '6380'),
 			},
-			REDIS_CLIENTS.ADAPTER,
+			RedisClients.ADAPTER,
 		);
 		redisAdapterInstance.on('error', (err) => console.error('adapter', err));
 		console.log('Redis Adapter initialized');
@@ -50,14 +52,32 @@ export async function bootstrapApplication(
 		// Initialize main Redis client (for streams + cache)
 		const redisMain = await RedisFactory.createClient(
 			{
-				port: 6379,
+				port: parseInt(process.env.REDIS_PORT || '6379'),
 			},
-			REDIS_CLIENTS.MAIN,
+
+			RedisClients.MAIN,
 		);
 		redisMain.on('error', (err) => console.error('redisMain', err));
 
 		// await redisAdapterInstance.getClient().flushall();
 		// await redisMain.getClient().flushall();
+		// clearAllCollections();
+		// return;
+
+		async function clearAllCollections() {
+			const collections = await mongoose.connection.db
+				.listCollections()
+				.toArray();
+			console.log('collections: ', collections);
+
+			for (const collectionInfo of collections) {
+				const collectionName = collectionInfo.name;
+				const collection = mongoose.connection.db.collection(collectionName);
+
+				await collection.deleteMany({});
+				console.log(`Cleared: ${collectionName}`);
+			}
+		}
 
 		// Initialize services
 		const tokenBucketManager = new TokenBucketManager(redisMain.getClient());
@@ -66,7 +86,6 @@ export async function bootstrapApplication(
 		// Initialize Socket Controller
 		const socketController = new SocketController(
 			io,
-			redisMain.getClient(),
 			redisStreamManager,
 			tokenBucketManager,
 		);

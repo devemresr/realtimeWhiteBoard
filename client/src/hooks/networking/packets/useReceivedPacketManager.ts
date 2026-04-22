@@ -1,25 +1,33 @@
 import logger from '../../../util/logger';
 import { useCallback, useRef } from 'react';
 
+// Tracks the state of an in-progress stroke as packets arrive over the network.
+// Since packets can arrive out of order or not at all, we need to maintain
+// enough state to detect gaps and know when a stroke is fully received.
 interface PacketSituation {
 	receivedPacketIds: Set<number>;
 	expectedPacketSequenceNumber: number;
 	highestPacketSequenceNumber: number;
 	missingPacketIds: Set<number>;
-	permanentGaps: Set<number>; // Track permanent gaps
-	lastPacketSequenceNumber: number | null;
+	permanentGaps: Set<number>; // Gaps that were never filled after all recovery attempts
+	lastPacketSequenceNumber: number | null; // null until we receive the packet marked isLastPacket
 	lastRenderedSequence: number;
 	holdRendering: boolean;
 }
 
 export const useReceivedPacketManager = () => {
+	// One situation entry per active stroke, keyed by strokeId.
+	// Cleared when the stroke completes or is abandoned.
 	const packetSituations = useRef<Map<string, PacketSituation>>(new Map());
 
+	// Creates a new situation for a stroke we haven't seen before,
+	// or updates an existing one with the incoming packet.
+	// Always call this first when a packet arrives.
 	const updateSituation = useCallback(
 		(
 			strokeId: string,
 			packetSequenceNumber: number,
-			isLastPacket: boolean
+			isLastPacket: boolean,
 		): PacketSituation => {
 			let situation = packetSituations.current.get(strokeId);
 
@@ -31,23 +39,30 @@ export const useReceivedPacketManager = () => {
 					missingPacketIds: new Set<number>(),
 					permanentGaps: new Set<number>(),
 					highestPacketSequenceNumber: 0,
+					// We may not know the total packet count until the last packet arrives
 					lastPacketSequenceNumber: isLastPacket ? packetSequenceNumber : null,
 					holdRendering: false,
 					lastRenderedSequence: 0,
 				};
 			}
 
+			// Once we know the final sequence number, record it for completion checks
 			if (isLastPacket) {
 				situation.lastPacketSequenceNumber = packetSequenceNumber;
 			}
 
+			packetSituations.current.set(strokeId, situation);
 			situation.receivedPacketIds.add(packetSequenceNumber);
 
 			return situation;
 		},
-		[]
+		[],
 	);
 
+	// Scans the range between the last known highest sequence and the current one,
+	// adding any sequence numbers we haven't received yet to missingPacketIds.
+	// Only called when a packet arrives out of order.
+	// Note: highestPacketSequenceNumber must be updated by the caller after this runs.
 	const detectMissingPackets = useCallback(
 		(situation: PacketSituation, packetSequenceNumber: number) => {
 			logger.debug('Out-of-order packet detected', {
@@ -56,7 +71,6 @@ export const useReceivedPacketManager = () => {
 				highestPacketSequenceNumber: situation.highestPacketSequenceNumber,
 			});
 
-			// Scan from last highest sequence to current to find gaps
 			for (
 				let i = situation.highestPacketSequenceNumber + 1;
 				i < packetSequenceNumber;
@@ -71,9 +85,12 @@ export const useReceivedPacketManager = () => {
 				missing: Array.from(situation.missingPacketIds),
 			});
 		},
-		[]
+		[],
 	);
 
+	// Called when a gap has exceeded its recovery timeout and we've given up waiting.
+	// The sequence is moved from missingPacketIds to permanentGaps so the
+	// caller can decide how to handle it (interpolate, skip, show indicator, etc).
 	const markGapAsPermanent = useCallback(
 		(strokeId: string, sequence: number): void => {
 			const situation = packetSituations.current.get(strokeId);
@@ -84,9 +101,12 @@ export const useReceivedPacketManager = () => {
 
 			logger.warn('Gap marked as permanent', { strokeId, sequence });
 		},
-		[]
+		[],
 	);
 
+	// A stroke is only complete when we've received every packet from 1 to N.
+	// We can't know N until the packet marked isLastPacket arrives, so this
+	// returns false until that happens regardless of how many packets we have.
 	const isStrokeComplete = useCallback(
 		(situation: PacketSituation): boolean => {
 			if (situation.lastPacketSequenceNumber === null) {
@@ -105,9 +125,12 @@ export const useReceivedPacketManager = () => {
 
 			return isComplete;
 		},
-		[]
+		[],
 	);
 
+	// Removes all state for a stroke. Call this after a stroke completes
+	// or is otherwise finished with — the situation is no longer needed
+	// and holding onto it would be a memory leak for long sessions.
 	const clearSituationState = useCallback((strokeId: string) => {
 		const situation = packetSituations.current.get(strokeId);
 

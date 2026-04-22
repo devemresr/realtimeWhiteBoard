@@ -1,23 +1,24 @@
 .gitignore
 node_modules
-server/.env
-client/.env
-.env.local
-.env.production
-client/.env.production
+/.env
+/.env.local
+/.env.production
+/client/.env.production
 todo.txt
 devblog.txt
 recall.txt
-.env
 client/.next/
 client/out/
 accounts.txt
 dump.rdb
 
 /client/mocks
+/server/controllers/protectedd.ts
 
 # Playwright
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+

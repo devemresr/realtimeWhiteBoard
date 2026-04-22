@@ -1,11 +1,16 @@
 'use client';
 
-import React, { useRef, useState, useCallback, useMemo } from 'react';
+import React, {
+	useRef,
+	useState,
+	useCallback,
+	useMemo,
+	useEffect,
+} from 'react';
 import { Socket } from 'socket.io-client';
-// import useCanvasDrawing from '../hooks/canvas/drawing/useCanvasDrawing';
-import useCanvasDrawing from '../../mocks/mockuseCanvasDrawing';
+import useCanvasDrawing from '../hooks/canvas/drawing/useCanvasDrawing';
 import useSocketSubscription from '../hooks/networking/socket/useSocketSubscription';
-import { ToolHandlersMap, ToolType } from '@/types';
+import { ToolHandlersMap, ToolType } from 'src/types/tool.types';
 import CanvasSideBar from './canvasSideBar/canvasSideBar';
 import { CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
@@ -16,12 +21,13 @@ import { useBroadcastRenderer } from '../hooks/networking/synchronization/useBro
 import { useRoomPacketBuilder } from '../hooks/networking/packets/usePacketBuilder';
 import { useCanvasState } from '../hooks/canvas/state/useCanvasState';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
-// import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
+import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
 import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
 import { useEraserManager } from '../hooks/canvas/drawing/useEraserManager';
-import { useCollisionDetection } from '../hooks/useCollisionDetection';
-import { canvasBarItems, cursors } from './config';
+import { useCollisionDetection } from '../hooks/canvas/drawing/useCollisionDetection';
+import logger from '../util/logger';
+
 interface ChildComponentProps {
 	socket: Socket | null;
 }
@@ -40,12 +46,11 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	// Replace offsetX/offsetY with getCanvasCoordinates() helper that transforms
 	// pointer events from display space to internal canvas resolution (1920x1080)
 	const canvasState = useCanvasState({
-		canvasHeight: 1800,
-		canvasWidth: 1000,
+		canvasHeight: 1000,
+		canvasWidth: 1800,
 	});
 	const {
 		getStrokeIdsNearPoint,
-		getStrokeBoundingBox,
 		storeStrokeInterpolatedPoints,
 		getStrokeInterpolatedPoints,
 	} = canvasState;
@@ -53,6 +58,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const {
 		clearCanvas,
 		drawDotOnCanvas,
+		drawPoints,
 		drawIncrementalPath,
 		getEnrichedInterpolatedPoints,
 	} = useCanvasDrawing(canvasRef, {
@@ -66,13 +72,11 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { drawBroadcastPath } = useBroadcastRenderer(
 		canvasState,
 		drawIncrementalPath,
-		storeStrokeInterpolatedPoints,
-		drawDotOnCanvas,,
 	);
 
-	const { analytics } = useSocketSubscription(socket, drawBroadcastPath);
 	const roomPacketBuilder = useRoomPacketBuilder({ roomId: 'room2' });
-	const { handlePacketSending } = usePacketTransmitter(socket, canvasState);
+	const packetTransmitter = usePacketTransmitter(socket, canvasState);
+	const { handlePacketSending } = packetTransmitter;
 
 	const drawTool = useDrawTool({
 		brushColor,
@@ -85,7 +89,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		handlePacketSending,
 	});
 
-	const collisionDetection = useCollisionDetection(getStrokeInterpolatedPoints);
+	const collisionDetection = useCollisionDetection(canvasState);
 
 	const eraserManager = useEraserManager({
 		canvasWidth: 1800,
@@ -93,12 +97,16 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		canvasState,
 		drawIncrementalPath,
 		drawDotOnCanvas,
-		getStrokeBoundingBox,
-		getStrokeIdsNearPoint,
 		collisionDetection,
 		clearCanvas,
 		gridSize: 100,
 	});
+
+	const { handleMessage } = useSocketSubscription(
+		socket,
+		drawBroadcastPath,
+		eraserManager,
+	);
 
 	const eraserTool = useEraserTool({
 		canvasRef,
@@ -107,38 +115,30 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		eraserManager,
 		roomPacketBuilder,
 		getEnrichedInterpolatedPoints,
-		handlePacketSending,
+		packetTransmitter,
 	});
 	const tools = useMemo<Partial<ToolHandlersMap>>(
 		() => ({
 			draw: drawTool,
 			erase: eraserTool,
 		}),
-		[drawTool],,
+		[drawTool],
 	);
 
 	const getOnboardingDataQuerry = useGetOnboardingData();
 
 	// hook to get onboarding data
-	// const { loadOnboardsingData, isLoading, isError } = useOnboardingSync(
-	// 	drawBroadcastPath,
-	// 	getOnboardingDataQuerry,,
-	// );
+	const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
+		getOnboardingDataQuerry,
+		handleMessage,
+	);
 
-	// // Handler for onboarding button
-	// const handleGetOnboardingData = useCallback(
-	// 	async (e: React.MouseEvent) => {
-	// 		e.preventDefault();
-
-	// 		try {
-	// 			await loadOnboardingData();
-	// 			logger.info('Onboarding data loaded successfully');
-	// 		} catch (error) {
-	// 			logger.error('Failed to load onboarding data', error);
-	// 		}
-	// 	},
-	// 	[loadOnboardingData],
-	// );
+	// Handler for onboarding button
+	useEffect(() => {
+		loadOnboardingData().catch((error) => {
+			logger.error('Failed to load onboarding data on mount', error);
+		});
+	}, []);
 
 	const startInteraction = (e: React.PointerEvent<HTMLCanvasElement>) => {
 		const currentTool = tools[selectedElement];
@@ -154,54 +154,47 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		const currentTool = tools[selectedElement];
 		currentTool?.endInteraction?.();
 	};
-	const cursor = canvasBarItems.find(
-		(item) => item.key === selectedElement,
-	).cursor;
-	return (
-		<div className=' flex relative'>
-			<style>
-				{` /* Apply custom cursor to canvas */
-          canvas {
-            cursor: ${cursors[cursor]}, auto;
-          }
-        `}
-			</style>
-			<Menu />
-			<CanvasBar
-				setSelectedElement={setSelectedElement}
-				selectedElement={selectedElement}
-				clearCanvas={clearCanvas}
-				isLogging={isLogging}
-				setIsLogging={setIsLogging}
-			/>
-			<CanvasSideBar
-				selectedElement={selectedElement}
-				brushColor={brushColor}
-				setBrushColor={setBrushColor}
-				brushSize={brushSize}
-				setBrushSize={setBrushSize}
-				brushShape={brushShape}
-				setBrushShape={setBrushShape}
-				textStyle={textStyle}
-				setTextStyle={setTextStyle}
-			/>
-			<canvas
-				aria-label='canvas'
-				ref={canvasRef}
-				width={1800}
-				height={1000}
-				onPointerDown={startInteraction}
-				onPointerMove={(e) => {
-					interact(e);
-					updateMousePosition(e);
-				}}
-				onPointerUp={stopInteraction}
-				onPointerLeave={stopInteraction}
-				style={{ touchAction: 'none' }} // prevents default touch behaviors
-				className={`border border-gray-300 `} //${cursor}
-			/>
 
-				{/* <button onClick={handleGetOnboardingData}> get onboardingData</button> */}
+	return (
+		<>
+			<div className='flex relative'>
+				<Menu />
+				<CanvasBar
+					setSelectedElement={setSelectedElement}
+					selectedElement={selectedElement}
+					clearCanvas={clearCanvas}
+					isLogging={isLogging}
+					setIsLogging={setIsLogging}
+				/>
+				<CanvasSideBar
+					selectedElement={selectedElement}
+					brushColor={brushColor}
+					setBrushColor={setBrushColor}
+					brushSize={brushSize}
+					setBrushSize={setBrushSize}
+					brushShape={brushShape}
+					setBrushShape={setBrushShape}
+					textStyle={textStyle}
+					setTextStyle={setTextStyle}
+				/>
+
+				<canvas
+					onContextMenu={(e) => e.preventDefault()}
+					aria-label='canvas'
+					ref={canvasRef}
+					width={1800}
+					height={1000}
+					onPointerDown={startInteraction}
+					onPointerMove={(e) => {
+						interact(e);
+						updateMousePosition(e);
+					}}
+					onPointerUp={stopInteraction}
+					onPointerLeave={stopInteraction}
+					style={{ touchAction: 'none' }} // prevents default touch behaviors
+					// todo custom cursors based on tools
+					className='cursor-crosshair border border-gray-300'
+				/>
 
 				{isLogging && (
 					<div

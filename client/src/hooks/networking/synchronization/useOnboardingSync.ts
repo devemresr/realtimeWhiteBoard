@@ -1,148 +1,170 @@
-// import { useCallback } from 'react';
-// import logger from '../../../util/logger';
-// import { Packet } from '@/types';
-// import { DrawBroadcastPathFn } from './useBroadcastPath';
-// import { useGetOnboardingData } from '../../api/endpoints/useFormPosts';
+import { useCallback } from 'react';
+import logger from '../../../util/logger';
+import {
+	CanvasOperation,
+	NetworkCanvasOperation,
+	NetworkCanvasEvent,
+	MessageStatus,
+	CanvasOperationType,
+	DrawingOperation,
+	EraserOperation,
+	LassoOperation,
+	CanvasEvent,
+	MessageCategory,
+} from '@/types';
+import { useGetOnboardingData } from '../../api/endpoints/useFormPosts';
+import { HandleMessageFn } from '../socket/useSocketSubscription';
 
-// export const useOnboardingSync = (
-// 	drawBroadcastPath: DrawBroadcastPathFn,
-// 	getOnboardingDataQuery: ReturnType<typeof useGetOnboardingData>,
-// ) => {
-// 	/**
-// 	 * Deduplicates packets based on packetId
-// 	 */
-// 	const deduplicatePackets = useCallback(
-// 		(
-// 			allStrokes: StrokePacket[][],
-// 		): {
-// 			deduped: StrokePacket[][];
-// 			duplicates: StrokePacket[];
-// 		} => {
-// 			const seen = new Set<string>();
-// 			const duplicates: StrokePacket[] = [];
+interface OnboardingData {
+	[MessageCategory.DRAWING]: NetworkCanvasOperation[];
+	[MessageCategory.EVENT]: NetworkCanvasEvent[];
+}
 
-// 			const deduped = allStrokes.map((packets) =>
-// 				packets.filter((pkg) => {
-// 					if (seen.has(pkg.packetId)) {
-// 						duplicates.push(pkg);
-// 						logger.warn('Duplicate packet detected', {
-// 							packetId: pkg.packetId,
-// 						});
-// 						return false;
-// 					}
-// 					seen.add(pkg.packetId);
-// 					return true;
-// 				}),
-// 			);
+export const useOnboardingSync = (
+	getOnboardingDataQuery: ReturnType<typeof useGetOnboardingData>,
+	handleMessage: HandleMessageFn,
+) => {
+	const deduplicatePackets = useCallback(
+		(
+			allPackets: NetworkCanvasOperation[],
+		): {
+			deduped: NetworkCanvasOperation[];
+			duplicates: NetworkCanvasOperation[];
+		} => {
+			const seen = new Set<string>();
+			const duplicates: NetworkCanvasOperation[] = [];
 
-// 			return { deduped, duplicates };
-// 		},
-// 		[],
-// 	);
+			const deduped = allPackets.filter((packet) => {
+				if (seen.has(packet.canvasMessageId)) {
+					duplicates.push(packet);
+					logger.warn('Duplicate packet detected', {
+						canvasMessageId: packet.canvasMessageId,
+						strokeId: packet.strokeId,
+						packetSequenceNumber: packet.packetSequenceNumber,
+					});
+					return false;
+				}
+				seen.add(packet.canvasMessageId);
+				return true;
+			});
 
-// 	/**
-// 	 * Renders onboarding data using the broadcast path (gap detection, sequencing, etc.)
-// 	 */
-// 	const renderOnboardingData = useCallback(
-// 		(allStrokePackets: StrokePacket[][]) => {
-// 			const { deduped, duplicates } = deduplicatePackets(allStrokePackets);
+			logger.debug('Dedup summary', {
+				totalPacketsIn: allPackets.length,
+				totalPacketsOut: deduped.length,
+				totalDuplicates: duplicates.length,
+				duplicatePacketIds: duplicates.map((p) => p.canvasMessageId),
+			});
 
-// 			if (duplicates.length > 0) {
-// 				logger.warn('Found duplicate packets during onboarding', {
-// 					count: duplicates.length,
-// 					duplicateIds: duplicates.map((d) => d.packetId),
-// 				});
-// 			}
+			return { deduped, duplicates };
+		},
+		[],
+	);
 
-// 			logger.info('Rendering onboarding data', {
-// 				strokeCount: deduped.length,
-// 				totalPackets: deduped.reduce((sum, stroke) => sum + stroke.length, 0),
-// 			});
+	const renderOnboardingData = useCallback(
+		({
+			drawing: drawingData,
+			event: eventData,
+		}: {
+			drawing: NetworkCanvasOperation[];
+			event: NetworkCanvasEvent[];
+		}) => {
+			const { deduped, duplicates } = deduplicatePackets(drawingData);
 
-// 			// Render each stroke
-// 			deduped.forEach((strokePacket, strokeIndex) => {
-// 				logger.debug('Rendering stroke', {
-// 					strokeIndex,
-// 					packetCount: strokePacket.length,
-// 				});
+			if (duplicates.length > 0) {
+				logger.warn('Duplicate packets found during onboarding', {
+					count: duplicates.length,
+					duplicateIds: duplicates.map((d) => d.canvasMessageId),
+				});
+			}
 
-// 				// Render each packet in the stroke
-// 				strokePacket.forEach((pkg) => {
-// 					const isLastPacket = pkg.isLastPacket ?? false;
-// 					const {
-// 						packetId,
-// 						strokeId,
-// 						packetSequenceNumber,
-// 						strokeSequenceNumber,
-// 						roomId,
-// 						authorId,
-// 						isErased,
-// 						points = [],
-// 					} = pkg;
+			logger.info('Rendering onboarding data', {
+				strokeCount: deduped.length,
+				totalPackets: deduped.length,
+				eventCount: eventData.length,
+			});
 
-// 					logger.debug('Rendering onboarding packet', {
-// 						packetId: pkg.packetId,
-// 						strokeId: pkg.strokeId,
-// 						sequenceNumber: pkg.packetSequenceNumber,
-// 						pointCount: pkg.points?.length ?? 0,
-// 						isLastPacket,
-// 					});
+			deduped.forEach((packet) => {
+				let fullPacket: CanvasOperation;
 
-// 					// Use the broadcast path - this ensures:
-// 					// 1. Gap detection works
-// 					// 2. Sequential rendering
-// 					// 3. Same Catmull-Rom interpolation as live drawing
-// 					const packet = {
-// 						points,
-// 						strokeSequenceNumber,
-// 						roomId,
-// 						authorId,
-// 						isLastPacket,
-// 						packetId,
-// 						strokeId,
-// 						isErased,
-// 						packetSequenceNumber,
-// 					};
-// 					drawBroadcastPath(packet);
-// 				});
-// 			});
+				switch (packet.type) {
+					case CanvasOperationType.DRAWING:
+						fullPacket = {
+							...packet,
+							status: MessageStatus.RECEIVED,
+						} as DrawingOperation;
+						break;
+					case CanvasOperationType.ERASER:
+						fullPacket = {
+							...packet,
+							status: MessageStatus.RECEIVED,
+						} as EraserOperation;
+						break;
+					case CanvasOperationType.LASSO:
+						fullPacket = {
+							...packet,
+							status: MessageStatus.RECEIVED,
+						} as LassoOperation;
+						break;
+				}
 
-// 			logger.info('Onboarding data rendered successfully');
-// 		},
-// 		[drawBroadcastPath, deduplicatePackets],
-// 	);
+				eventData.forEach((canvasEvent) => {
+					handleMessage({
+						...canvasEvent,
+						status: MessageStatus.RECEIVED,
+					} as CanvasEvent);
+				});
 
-// 	/**
-// 	 * Triggers the onboarding data fetch and renders it
-// 	 */
-// 	const loadOnboardingData = useCallback(
-// 		async (e?: React.MouseEvent): Promise<void> => {
-// 			e?.preventDefault();
-// 			logger.info('Loading onboarding data');
+				handleMessage(fullPacket);
+			});
 
-// 			const { data } = await getOnboardingDataQuery.refetch();
+			logger.info('Onboarding data rendered successfully', {
+				packetsRendered: deduped.length,
+				eventsRendered: eventData.length,
+			});
+		},
+		[deduplicatePackets, handleMessage],
+	);
 
-// 			const allStrokes = (data as { data?: unknown })?.data ?? null;
+	const loadOnboardingData = useCallback(
+		async (e?: React.MouseEvent): Promise<void> => {
+			e?.preventDefault();
+			logger.info('Loading onboarding data');
 
-// 			if (!allStrokes || !Array.isArray(allStrokes)) {
-// 				logger.warn('No onboarding data found or invalid format');
-// 				return;
-// 			}
+			const { data } = await getOnboardingDataQuery.refetch();
+			// controller returns { drawingData, eventData } — map to OnboardingData shape for renderOnboardingData
+			const { drawingData, eventData } =
+				(data as {
+					drawingData?: NetworkCanvasOperation[];
+					eventData?: NetworkCanvasEvent[];
+				}) ?? {};
+			logger.debug('onboardingData', { drawingData, eventData });
 
-// 			logger.debug('Onboarding data fetched', {
-// 				dataStructure: data,
-// 			});
+			if (!data) {
+				logger.warn('No onboarding data found or invalid format');
+				return;
+			}
+			if (!drawingData || !eventData) {
+				logger.warn('Onboarding data missing expected fields', {
+					hasDrawing: !!drawingData,
+					hasEvents: !!eventData,
+				});
+			}
 
-// 			renderOnboardingData(allStrokes);
-// 		},
-// 		[getOnboardingDataQuery, renderOnboardingData],
-// 	);
+			// if the controller returned data, trust it has the right shape —
+			// empty arrays are valid (room with no strokes yet)
+			renderOnboardingData({
+				[MessageCategory.DRAWING]: drawingData ?? [],
+				[MessageCategory.EVENT]: eventData ?? [],
+			});
+		},
+		[getOnboardingDataQuery, renderOnboardingData],
+	);
 
-// 	return {
-// 		loadOnboardingData,
-// 		renderOnboardingData, // Expose for custom usage
-// 		isLoading: getOnboardingDataQuery.isFetching,
-// 		isError: getOnboardingDataQuery.isError,
-// 		error: getOnboardingDataQuery.error,
-// 	};
-// };
+	return {
+		loadOnboardingData,
+		renderOnboardingData,
+		isLoading: getOnboardingDataQuery.isFetching,
+		isError: getOnboardingDataQuery.isError,
+		error: getOnboardingDataQuery.error,
+	};
+};

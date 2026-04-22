@@ -2,11 +2,21 @@
 
 import { useCallback } from 'react';
 import { Socket } from 'socket.io-client';
-import { SOCKET_EVENTS } from '../../../../../shared/constants/socketIoConstants';
+import { SocketEvent } from '@shared/constants/socketIoConstants';
 import logger from '../../../util/logger';
-import { PacketStatus, Packet, BasePoint } from '@/types';
+import {
+	MessageStatus,
+	CanvasMessage,
+	MessageCategory,
+	CanvasEvent,
+	CanvasOperation,
+} from '@/types';
 import { useCanvasState } from '../../canvas/state/useCanvasState';
 import { useSocketEmit } from '../socket/useSocketEmit';
+
+export type HandlePacketSendingFn = ReturnType<
+	typeof usePacketTransmitter
+>['handlePacketSending'];
 
 const usePacketTransmitter = (
 	socket: Socket | null,
@@ -14,71 +24,92 @@ const usePacketTransmitter = (
 ) => {
 	const { emit } = useSocketEmit(socket);
 
-	/**
-	 * Sends a single packet over the network
-	 */
-	const sendPacket = useCallback(
-		async (packet: Packet) => {
-			if (!socket) {
-				logger.error('user isnt connected');
-				return;
-			}
+	const toNetworkDrawingPacket = (packet: CanvasOperation) => {
+		const { status, lastAttemptTimestamp, timestamp, ...networkData } = packet;
+		return networkData;
+	};
 
+	const sendDrawingPacket = useCallback(
+		async (packet: CanvasOperation) => {
 			canvasState.updatePacketStatus(
 				packet.strokeId,
-				packet.packetId,
-				PacketStatus.SENDING,
+				packet.canvasMessageId,
+				MessageStatus.SENDING,
 			);
-			const onSent = () => {
-				canvasState.updatePacketStatus(
-					packet.strokeId,
-					packet.packetId,
-					PacketStatus.SENT,
+			try {
+				const result = await emit(
+					SocketEvent.SEND_PACKET,
+					toNetworkDrawingPacket(packet),
+					{
+						onSent: () =>
+							canvasState.updatePacketStatus(
+								packet.strokeId,
+								packet.canvasMessageId,
+								MessageStatus.SENT,
+							),
+					},
 				);
-			};
+				logger.debug('result of the packet emit event: ', result);
 
-			const result = await emit(
-				`${SOCKET_EVENTS.DRAWING_PACKET}`,
-				toNetworkPacket(packet),
-				{ onSent },
-			);
-			if (result.success) {
+				if (result.success) {
+					canvasState.updatePacketStatus(
+						packet.strokeId,
+						packet.canvasMessageId,
+						MessageStatus.ACKNOWLEDGED,
+					);
+				}
+			} catch (e) {
 				canvasState.updatePacketStatus(
 					packet.strokeId,
-					packet.packetId,
-					PacketStatus.ACKNOWLEDGED,
+					packet.canvasMessageId,
+					MessageStatus.FAILED,
 				);
-			}
-			if (result.error) {
-				canvasState.updatePacketStatus(
-					packet.strokeId,
-					packet.packetId,
-					PacketStatus.FAILED,
-				);
-				logger.error('Packet send failed', {
-					packetId: packet.packetId,
-					error: result.error,
+				logger.error('DrawingOperation send failed', {
+					canvasMessageId: packet.canvasMessageId,
+					error: e instanceof Error ? e.message : e,
 				});
 			}
 		},
 		[socket, emit, canvasState],
 	);
 
-	function toNetworkPacket(
-		packet: Packet,
-	): Omit<Packet, 'status' | 'lastAttemptTimestamp' | 'timestamp'> {
-		const { status, lastAttemptTimestamp, timestamp, ...networkData } = packet;
-		return networkData;
-	}
+	const sendEventPacket = useCallback(
+		async (packet: CanvasEvent) => {
+			try {
+				// todo switch to passing the actual roomId
+				const data = { ...packet, roomId: 'room2' };
+				await emit(SocketEvent.SEND_PACKET, data);
+			} catch (e) {
+				logger.error('CanvasEvent send failed', {
+					canvasMessageId: packet.canvasMessageId,
+					error: e instanceof Error ? e.message : e,
+				});
+			}
+		},
+		[socket, emit],
+	);
 
-	/**
-	 * Handle all packet sending logic
-	 */
+	const sendPacket = useCallback(
+		(packet: CanvasMessage) => {
+			if (!socket) {
+				logger.error('user isnt connected');
+				return;
+			}
+
+			switch (packet.category) {
+				case MessageCategory.DRAWING:
+					return sendDrawingPacket(packet);
+				case MessageCategory.EVENT:
+					return sendEventPacket(packet);
+			}
+		},
+		[socket, sendDrawingPacket, sendEventPacket],
+	);
+
 	const handlePacketSending = useCallback(() => {
-		const packets = canvasState.getAllPacketsToSend();
-
-		// Send all created packets
-		packets.forEach((packet) => sendPacket(packet));
+		const packetsToSend = canvasState.getAllPacketsToSend();
+		logger.debug(packetsToSend);
+		canvasState.getAllPacketsToSend().forEach(sendPacket);
 		return true;
 	}, [sendPacket, canvasState]);
 

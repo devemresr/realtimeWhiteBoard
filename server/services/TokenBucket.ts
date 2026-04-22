@@ -24,7 +24,7 @@ class TokenBucket {
 		tokenCap: number = 10000,
 		refillRate: number = 1000,
 		cost: number = 1000,
-		TTLforBuckets: number = 3600
+		TTLforBuckets: number = 3600,
 	) {
 		this.redis = redis;
 		this.userId = userId;
@@ -53,7 +53,7 @@ class TokenBucket {
 				this.tokenCap.toString(),
 				this.refillRate.toString(),
 				this.cost.toString(),
-				this.TTLforBuckets
+				this.TTLforBuckets,
 			)) as number;
 
 			const msPerToken = 1000 / this.refillRate;
@@ -72,7 +72,7 @@ class TokenBucket {
 				`Redis error in token bucket for user ${this.userId}:` + error;
 			console.error(errmsg);
 			// Fail closed - allow request if Redis is down retry after 5 sec
-			// todo currently were failing closed might need to find a way around to serve with reduced feautures
+			// todo decide how to handle when there's a redis failure
 			return { allowed: false, error: errmsg, retryAfter: 5000 };
 		}
 	}
@@ -88,14 +88,14 @@ class TokenBucket {
 				key,
 				now.toString(),
 				this.tokenCap.toString(),
-				this.refillRate.toString()
+				this.refillRate.toString(),
 			)) as number;
 
 			return tokens;
 		} catch (error) {
 			console.error(
 				`Redis error getting remaining tokens for user ${this.userId}:`,
-				error
+				error,
 			);
 			return this.tokenCap;
 		}
@@ -110,7 +110,7 @@ class TokenBucket {
 		} catch (error) {
 			console.error(
 				`Error cleaning up Redis data for user ${this.userId}:`,
-				error
+				error,
 			);
 		}
 	}

@@ -1,20 +1,17 @@
 import { useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
-	Packet,
+	CanvasOperation,
 	DrawingPoint,
-	PacketStatus,
+	MessageStatus,
 	BasePoint,
 	EraserPoint,
-	DrawingPacket,
-	PacketType,
-	EraserPacket,
+	CanvasOperationType,
 	CanvasPoint,
 	LassoPoint,
-	LassoPacket,
-	PacketTypeToPoints,
+	CanvasOperationTypeToPoints,
+	MessageCategory,
 } from '@/types';
-import logger from '../../../util/logger';
 
 /**
  * Base configuration options for packet builders
@@ -90,8 +87,8 @@ export const useRoomPacketBuilder = (options: RoomPacketOptions) => {
 		};
 	};
 
-	const createPacket = <T extends PacketType>(
-		points: PacketTypeToPoints[T][],
+	const createPacket = <T extends CanvasOperationType>(
+		points: CanvasOperationTypeToPoints[T][],
 		seqNum: number,
 		type: T,
 		context: {
@@ -103,22 +100,22 @@ export const useRoomPacketBuilder = (options: RoomPacketOptions) => {
 		const basePacket = {
 			roomId: context.roomId,
 			strokeId: context.strokeId,
-			packetId: `${context.strokeId}-${seqNum}`,
+			canvasMessageId: `${context.strokeId}-${seqNum}`,
 			packetSequenceNumber: seqNum,
 			strokeSequenceNumber: context.strokeSequenceNumber,
+			category: MessageCategory.DRAWING,
 			type,
-			isErased: false as const,
 			authorId: 'anonymous',
-			status: PacketStatus.CREATED,
+			status: MessageStatus.CREATED,
 			points,
 			timestamp: Date.now(),
 		} as const;
 
-		return basePacket as Extract<Packet, { type: T }>;
+		return basePacket as Extract<CanvasOperation, { type: T }>;
 	};
 
-	const buildPackets = <T extends PacketType>(
-		points: PacketTypeToPoints[T][],
+	const buildPackets = <T extends CanvasOperationType>(
+		points: CanvasOperationTypeToPoints[T][],
 		type: T,
 	) => {
 		return buildPacketsFromPoints(points, (pts, seqNum) =>
@@ -131,39 +128,39 @@ export const useRoomPacketBuilder = (options: RoomPacketOptions) => {
 	};
 
 	const buildStrokePackets = (points: DrawingPoint[]) => {
-		return buildPackets(points, PacketType.DRAWING);
+		return buildPackets(points, CanvasOperationType.DRAWING);
 	};
 
 	const buildEraserPackets = (points: EraserPoint[]) => {
-		return buildPackets(points, PacketType.ERASER);
+		return buildPackets(points, CanvasOperationType.ERASER);
 	};
 
 	const buildLassoPackets = (points: LassoPoint[]) => {
-		return buildPackets(points, PacketType.LASSO);
+		return buildPackets(points, CanvasOperationType.LASSO);
 	};
 
-	const buildFinalPacket = <T extends PacketType>(
+	const buildFinalPacket = <T extends CanvasOperationType>(
 		points: CanvasPoint[],
 		type: T,
-	): Extract<Packet, { type: T }> => {
+	): Extract<CanvasOperation, { type: T }> => {
 		const authorId = 'anonymous';
 
 		const basePacket = {
 			roomId,
 			strokeId: strokeId.current,
-			packetId: `${strokeId.current}-${packetSequenceNumber.current}`,
+			canvasMessageId: `${strokeId.current}-${packetSequenceNumber.current}`,
 			packetSequenceNumber: packetSequenceNumber.current,
 			strokeSequenceNumber: strokeSequenceNumber.current,
 			isLastPacket: true as const,
-			isErased: false as const,
-			status: PacketStatus.CREATED,
+			status: MessageStatus.CREATED,
+			category: MessageCategory.DRAWING,
 			authorId,
 			timestamp: Date.now(),
 			type,
 			points,
 		} as const;
 
-		return basePacket as Extract<Packet, { type: T }>;
+		return basePacket as Extract<CanvasOperation, { type: T }>;
 	};
 
 	return {

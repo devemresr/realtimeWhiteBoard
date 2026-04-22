@@ -1,5 +1,5 @@
 import { BasePoint } from '@/types';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Socket } from 'socket.io-client';
 
 type EmitOptions = {
@@ -14,6 +14,10 @@ type EmitResult = {
 };
 
 export function useSocketEmit(socket: Socket | null) {
+	const socketRef = useRef(socket);
+	useEffect(() => {
+		socketRef.current = socket;
+	}, [socket]);
 	const emit = useCallback(
 		async (
 			eventName: string,
