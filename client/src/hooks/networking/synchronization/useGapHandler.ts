@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import logger from '../../../util/logger';
-import { Packet } from '@/types';
-import { HandleGapFilledFn, HandleGapPermanentFn } from './useBroadcastPath';
+import { CanvasOperation } from '@/types';
+import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
 
 interface GapTimer {
 	apiCallTimer: NodeJS.Timeout;
@@ -15,6 +15,8 @@ interface GapHandlerConfig {
 	permanentTimeout: number; // 1500ms - when to declare permanent
 	handleGapFilled: HandleGapFilledFn;
 	handleGapPermanent: HandleGapPermanentFn;
+	handleGapFilled: HandleGapFilledFn;
+	handleGapPermanent: HandleGapPermanentFn;
 	fetchPacket: (strokeId: string, sequence: number) => Promise<any>;
 }
 
@@ -25,7 +27,7 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 		`${strokeId}:${sequence}`;
 
 	const startGapTimeout = useCallback(
-		(packet: Packet, sequence: number) => {
+		(packet: CanvasOperation, sequence: number) => {
 			const strokeId = packet.strokeId;
 			const gapKey = getGapKey(strokeId, sequence);
 
@@ -46,6 +48,7 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 			const apiCallTimer = setTimeout(async () => {
 				logger.debug(
 					`[${gapKey}] API call timeout reached, fetching from backend`,
+					`[${gapKey}] API call timeout reached, fetching from backend`,
 				);
 
 				try {
@@ -54,6 +57,7 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 					if (packet) {
 						logger.info(`[${gapKey}] Successfully fetched missing packet`);
 						clearGapTimeout(gapKey);
+						config.handleGapFilled(packet, sequence);
 						config.handleGapFilled(packet, sequence);
 					} else {
 						logger.warn(`[${gapKey}] Packet not in backend yet`);
@@ -69,9 +73,11 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 			const permanentTimer = setTimeout(() => {
 				logger.warn(
 					`[${gapKey}] Permanent timeout reached, declaring gap permanent`,
+					`[${gapKey}] Permanent timeout reached, declaring gap permanent`,
 				);
 
 				clearGapTimeout(gapKey);
+				config.handleGapPermanent(packet, sequence);
 				config.handleGapPermanent(packet, sequence);
 			}, config.permanentTimeout);
 
@@ -82,6 +88,7 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 				strokeId,
 			});
 		},
+		[config],
 		[config],
 	);
 
@@ -102,6 +109,7 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 			const gapKey = getGapKey(strokeId, sequence);
 			clearGapTimeout(gapKey);
 		},
+		[clearGapTimeout],
 		[clearGapTimeout],
 	);
 
