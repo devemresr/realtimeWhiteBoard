@@ -1,7 +1,15 @@
 import { Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { JWT_EXPIRE_TIMES } from '../../shared/constants/jwtConstants';
+import { JWT_EXPIRE_TIMES } from './constants/jwtConstants';
+
+// Decoded-token shape
+/** Minimal claims expected inside a valid refresh/access token. */
+export interface TokenPayload {
+	userId: string;
+	email: string;
+	jti: string;
+}
 
 export const generateAccessToken = (userId: string, email: string) => {
 	if (!process.env.ACCESS_TOKEN_SECRET) {
@@ -20,7 +28,12 @@ export const generateAccessToken = (userId: string, email: string) => {
 	return accessToken;
 };
 
-export const setRefreshTokenCookie = (refreshToken: string, res: Response) => {
+export const setRefreshTokenCookie = (
+	userId: string,
+	email: string,
+	res: Response,
+) => {
+	const refreshToken = generateRefreshToken(userId, email);
 	res.cookie('jwt', refreshToken, {
 		httpOnly: true,
 		maxAge: 1000 * 60 * 60 * 30, // 30 days
@@ -30,7 +43,7 @@ export const setRefreshTokenCookie = (refreshToken: string, res: Response) => {
 	});
 };
 
-export const generateRefreshToken = (userId: string, email: string) => {
+const generateRefreshToken = (userId: string, email: string) => {
 	if (!process.env.REFRESH_TOKEN_SECRET) {
 		throw new Error('environment variable REFRESH_TOKEN_SECRET is not set');
 	}

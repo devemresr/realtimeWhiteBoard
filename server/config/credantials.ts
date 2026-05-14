@@ -1,4 +1,4 @@
-import allowedOrigins from './allowedOrigins.js';
+import allowedOrigins from './allowedOrigins';
 import { Request, Response, NextFunction } from 'express';
 
 const credentials = (req: Request, res: Response, next: NextFunction) => {

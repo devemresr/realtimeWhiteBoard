@@ -43,7 +43,7 @@ scenarios:
 
       - loop:
           - emit:
-              channel: 'packet:send'
+              channel: 'canvas:operation'
               data:
                 strokes:
                   [

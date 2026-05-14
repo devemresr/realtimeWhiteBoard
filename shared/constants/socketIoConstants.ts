@@ -2,10 +2,10 @@ export enum SocketEvent {
 	// Client -> Server
 	JOIN_ROOM = 'room:join',
 	LEAVE_ROOM = 'room:leave',
-	SEND_PACKET = 'packet:send',
+	CANVAS_OPERATION = 'canvas:operation',
 
 	// Server -> Client
-	BROADCAST_PACKET = 'packet:broadcast',
+	BROADCAST_OPERATION = 'packet:broadcast',
 	ROOM_JOINED = 'room:joined',
 	ROOM_LEFT = 'room:left',
 

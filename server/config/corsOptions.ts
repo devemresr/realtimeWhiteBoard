@@ -6,11 +6,7 @@ const corsOptions = {
 		origin: string | undefined,
 		callback: (error: Error | null, allow?: boolean) => void,
 	) => {
-		if (
-			!origin ||
-			(!origin && allowedOrigins.includes(origin)) ||
-			process.env.NODE_ENV === 'development'
-		) {
+		if (isOriginAllowed(origin)) {
 			callback(null, true);
 		} else {
 			logger.error(
@@ -26,3 +22,11 @@ const corsOptions = {
 };
 
 export default corsOptions;
+
+const isOriginAllowed = (origin?: string) => {
+	return (
+		!origin ||
+		(!origin && allowedOrigins.includes(origin)) ||
+		process.env.NODE_ENV === 'development'
+	);
+};

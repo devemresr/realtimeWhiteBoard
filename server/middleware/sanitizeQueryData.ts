@@ -1,28 +1,40 @@
 import { Request, Response } from 'express';
-import sanitizeAndDetect from '../utils/validateAndSanitize';
+import sanitizeAndDetect from './validateAndSanitize';
 import { NestedObject } from '../../shared/types/express';
+import logger from '@shared/util/logger';
 
 const sanitizeQueryData = (req: Request, res: Response): boolean => {
-	if (req.query && typeof req.query === 'object') {
+	if (
+		req.query &&
+		typeof req.query === 'object' &&
+		Object.entries(req.query).length > 0
+	) {
 		try {
-			console.log('reqquey in the sanitization func :', req.query);
+			logger.debug({ query: req.query }, 'Sanitizing query data');
+
 			const result = sanitizeAndDetect(req.query);
-			console.log('result :', result);
 
 			req.validatedQuery = result.sanitized as NestedObject;
-			console.log('result.sanitized', result.sanitized);
-			console.log('after the assining req.query:', req.validatedQuery);
+
+			logger.debug(
+				{ sanitized: result.sanitized },
+				'Query sanitized successfully',
+			);
 
 			if (result.hadProhibited) {
-				console.warn(`Sanitized prohibited operators from ${req.ip}`);
+				logger.warn(
+					{ ip: req.ip },
+					'Sanitized prohibited operators from request',
+				);
 			}
 
-			return true; // Success
+			return true;
 		} catch (error) {
-			return false; // Error occurred
+			logger.error({ err: error, ip: req.ip }, 'Failed to sanitize query data');
+			return false;
 		}
 	}
-	return true; // No query to sanitize
+	return true;
 };
 
 export default sanitizeQueryData;

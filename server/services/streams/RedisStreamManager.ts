@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { RedisStream, REDIS_KEYS } from '@shared/constants/socketIoConstants';
 import { CanvasOperation } from '@/types';
-import { addToStreamAndDedup } from '../scripts/addToStreamAndDedup';
+import { addToStreamAndDedup } from 'scripts/addToStreamAndDedup';
 
 interface StreamOptions {
 	maxLen?: number;
@@ -20,7 +20,11 @@ interface StreamMessage {
 	id: string;
 	data: MessageData;
 }
-
+/**
+ * Uses the main Redis instance (not the Socket.io adapter Redis).
+ * Redis Streams are an app-level concern.
+ * This is unrelated to how Socket.io syncs events between server nodes.
+ */
 class RedisStreamManager {
 	private redis: Redis | null = null;
 	private streamName: string | null = null;

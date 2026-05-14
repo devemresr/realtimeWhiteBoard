@@ -9,7 +9,7 @@ services:
       - redis_main_data:/data
     restart: unless-stopped
     networks:
-      - app_network
+      - dev_network
 
   # Redis Adapter (Socket.IO adapter)
   redis_adapter:
@@ -21,9 +21,9 @@ services:
       - redis_adapter_data:/data
     restart: unless-stopped
     networks:
-      - app_network
+      - dev_network
 
-  # MongoDB 
+  # MongoDB
   mongo:
     image: mongo:7
     container_name: mongodb
@@ -31,23 +31,30 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     networks:
-      - app_network
+      - dev_network
     environment:
       - MONGO_INITDB_DATABASE=myapp_dev
-    command: [ "--replSet", "rs0", "--bind_ip_all" ]
+    command: ["--replSet", "rs0", "--bind_ip_all"]
 
   mongo-init:
     image: mongo:7
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy # wait for healthcheck, not just "started"
     restart: "no"
     networks:
-      - app_network
+      - dev_network
     entrypoint: >
       bash -c "sleep 5 && mongosh --host mongo:27017 --eval \"rs.initiate({_id:
-      'rs0', members: [{_id: 0, host: 'localhost:27017'}]})\""
+      'rs0', members: [{_id: 0, host: 'mongo:27017'}]})\""
 
 volumes:
   redis_main_data:
@@ -55,5 +62,5 @@ volumes:
   mongodb_data:
 
 networks:
-  app_network:
+  dev_network:
     driver: bridge

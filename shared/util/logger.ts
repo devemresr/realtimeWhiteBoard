@@ -1,12 +1,12 @@
 import pino from 'pino';
 
-const isDev = process.env.NODE_ENV !== 'production';
+const env = process.env.NODE_ENV;
 
 const logger = pino({
-	level: process.env.LOG_LEVEL || (isDev ? 'debug' : 'info'),
+	level: process.env.LOG_LEVEL || (env === 'development' ? 'debug' : 'info'),
 
 	// Pretty printing for development
-	...(isDev && {
+	...(env === 'development' && {
 		transport: {
 			target: 'pino-pretty',
 			options: {
@@ -18,7 +18,7 @@ const logger = pino({
 		},
 	}),
 
-	...(!isDev && {
+	...(env === 'production' && {
 		base: { pid: false, hostname: false },
 		timestamp: pino.stdTimeFunctions.isoTime,
 		formatters: { level: (label) => ({ level: label }) },

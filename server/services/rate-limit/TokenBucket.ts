@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { Socket } from 'socket.io';
-import { attemptToSpendToken } from '../scripts/attemptToSpendToken';
-import { getRemainingTokensScript } from '../scripts/getRemainingTokensScript';
+import { attemptToSpendToken } from '../../scripts/attemptToSpendToken';
+import { getRemainingTokensScript } from '../../scripts/getRemainingTokensScript';
 
 interface spendTokenResponse {
 	allowed: boolean;

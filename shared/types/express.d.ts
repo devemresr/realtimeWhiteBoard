@@ -9,7 +9,6 @@ declare global {
 			userId?: string;
 			accessToken?: string;
 			tokenRefreshNeeded?: boolean;
-			tokenIsBlacklisted?: boolean;
 			validatedQuery?: NestedObject;
 		}
 	}

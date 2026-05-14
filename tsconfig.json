@@ -1,5 +1,7 @@
 {
 	"files": [],
 	"references": [{ "path": "./client" }, { "path": "./server" }],
-	"compilerOptions": { "types": ["node"] }
+	"compilerOptions": {
+		"types": ["node", "jest"]
+	}
 }

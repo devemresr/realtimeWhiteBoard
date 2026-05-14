@@ -1,141 +1,134 @@
 import Redis, { RedisOptions } from 'ioredis';
+import logger from '@shared/util/logger';
 import { EventEmitter } from 'events';
 
 export class RedisClient extends EventEmitter {
 	private client: Redis;
 	private config: RedisOptions;
 	private isConnected = false;
-	private redisClientName: String;
+	private clientName: string;
 	private connectionPromise: Promise<void> | null = null;
 
-	constructor(config?: RedisOptions, redisClientName?: String) {
+	private log;
+
+	private setupEventHandlers(): void {
+		// persistent listener — stays attached through retries
+		this.client?.on('error', (err) => {
+			this.isConnected = false;
+			console.error(`[${this.clientName}] error:`, err);
+		});
+
+		this.client?.on('ready', () => {
+			this.isConnected = true;
+			this.log.info('Redis connection ready');
+		});
+
+		this.client?.on('reconnecting', () => {
+			this.log.warn('Reconnecting...');
+		});
+
+		this.client?.on('end', () => {
+			this.isConnected = false;
+			console.warn(
+				`[${this.clientName}] connection ended, status:`,
+				this.client.status,
+			);
+		});
+	}
+
+	private constructor(config?: RedisOptions, clientName?: string) {
 		super();
+		this.clientName = clientName ?? `redis-${Date.now()}`;
+		this.log = logger.child({ redisClient: this.clientName });
 
 		this.config = {
 			host: process.env.REDIS_HOST || 'localhost',
-			port: parseInt(process.env.REDIS_PORT || '6380'),
+			port: parseInt(process.env.REDIS_PORT || '6379'),
+			// maxRetriesPerRequest: process.env.NODE_ENV === 'production' ? 3 : null,
 			maxRetriesPerRequest: 3,
 			connectTimeout: 10000,
 			keepAlive: 30000,
 			enableReadyCheck: true,
-			lazyConnect: true,
 			retryStrategy: (times) => {
 				if (times > 10) {
-					console.error('Redis connection failed after 10 retry attempts');
-					return null; // Stop retrying
+					this.log.error(
+						'Connection failed after 10 retry attempts — giving up',
+					);
+					return null;
 				}
 				const delay = Math.min(times * 50, 500);
-				console.log(
-					`Redis retrying connection in ${delay}ms (attempt ${times})`,
+				this.log.warn(
+					{ attempt: times, delayMs: delay },
+					'Retrying connection',
 				);
-				return delay; // Exponential backoff, max 500ms
+				return delay;
 			},
 			...config,
+			// ...{ lazyConnect: true },
 		};
 
-		this.redisClientName = redisClientName || `redis-${Date.now()}`;
 		this.client = new Redis(this.config);
 		this.setupEventHandlers();
 	}
 
-	private setupEventHandlers(): void {
-		this.client.on('connecting', () => {
-			console.log(`[${this.redisClientName}] Connecting to Redis...`);
-			this.emit('connecting');
-		});
+	// static async create(config?: RedisOptions, clientName?: string) {
+	// 	const instance = new RedisClient(config, clientName);
+	// 	// await instance.connect();
+	// 	return instance;
+	// }
+	static async create(config?: RedisOptions, clientName?: string) {
+		const instance = new RedisClient(config, clientName);
 
-		this.client.on('connect', () => {
-			console.log(`[${this.redisClientName}] Connected to Redis...`);
-			this.emit('connect');
-		});
+		// Wait for the automatic connection to be ready
+		return new Promise<RedisClient>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				reject(new Error(`Redis connection timeout for ${clientName}`));
+			}, 10000);
 
-		this.client.on('ready', () => {
-			this.isConnected = true;
-			console.log(`[${this.redisClientName}] Redis ready`);
-			this.emit('ready');
-		});
+			instance.client.once('ready', () => {
+				clearTimeout(timeout);
+				instance.isConnected = true;
+				resolve(instance);
+			});
 
-		this.client.on('error', (err) => {
-			this.isConnected = false;
-			console.error(`[${this.redisClientName}] Redis connection error:`, err);
-			this.emit('error', err);
-		});
-
-		this.client.on('close', () => {
-			this.isConnected = false;
-			console.log(`[${this.redisClientName}] Redis connection closed`);
-			this.emit('close');
-		});
-
-		this.client.on('reconnecting', () => {
-			console.log(`[${this.redisClientName}] Redis reconnecting...`);
-			this.emit('reconnecting');
-		});
-
-		this.client.on('end', () => {
-			this.isConnected = false;
-			console.log(`[${this.redisClientName}] Redis connection ended`);
-			this.emit('end');
-		});
-	}
-
-	async connect(): Promise<void> {
-		if (this.connectionPromise) {
-			return this.connectionPromise;
-		}
-
-		if (this.isConnected) {
-			return Promise.resolve();
-		}
-
-		this.connectionPromise = new Promise<void>((resolve, reject) => {
-			const onReady = () => {
-				cleanup();
-				resolve();
-			};
-
-			const onError = (err: Error) => {
-				cleanup();
+			instance.client.once('error', (err) => {
+				clearTimeout(timeout);
 				reject(err);
-			};
-
-			const cleanup = () => {
-				this.removeListener('ready', onReady);
-				this.removeListener('error', onError);
-				this.connectionPromise = null;
-			};
-
-			this.once('ready', onReady);
-			this.once('error', onError);
-
-			this.client.connect().catch((err) => {
-				console.error(
-					`[${this.redisClientName}] client.connect() threw error:`,
-					err,
-				);
-				onError(err);
 			});
 		});
-
-		return this.connectionPromise;
 	}
 
-	async waitForConnection(timeoutMs: number = 10000): Promise<void> {
-		if (this.isConnected) return;
+	// async connect(): Promise<void> {
+	// 	if (this.isConnected) return;
+	// 	if (this.connectionPromise) return this.connectionPromise;
 
-		return Promise.race([
-			this.connect(),
-			new Promise<never>((_, reject) => {
-				setTimeout(() => {
-					reject(new Error(`Redis connection timeout after ${timeoutMs}ms`));
-				}, timeoutMs);
-			}),
-		]);
-	}
+	// 	this.connectionPromise = new Promise<void>((resolve, reject) => {
+	// 		// this once() is only for the initial connect attempt result
+	// 		this.client.once('ready', () => {
+	// 			this.connectionPromise = null;
+	// 			this.isConnected = true;
+	// 			resolve();
+	// 		});
 
-	getClient(): Redis {
+	// 		this.client.once('error', (err) => {
+	// 			this.connectionPromise = null;
+	// 			reject(err);
+	// 		});
+
+	// 		this.client.connect().catch((err) => {
+	// 			this.connectionPromise = null;
+	// 			reject(err);
+	// 		});
+	// 	});
+
+	// 	return this.connectionPromise;
+	// }
+
+	getRawClient(): Redis {
 		if (!this.isReady()) {
-			throw new Error('Redis client not ready. Call connect() first.');
+			throw new Error(
+				`[${this.clientName}] Client not ready — call connect() first`,
+			);
 		}
 		return this.client;
 	}
@@ -145,18 +138,15 @@ export class RedisClient extends EventEmitter {
 	}
 
 	async ping(): Promise<string> {
-		if (!this.isConnected) throw new Error('Redis not connected');
+		if (!this.isConnected)
+			throw new Error(`[${this.clientName}] Not connected`);
 		return this.client.ping();
 	}
 
 	async healthCheck() {
 		try {
 			const ping = await this.ping();
-			return {
-				connected: this.isConnected,
-				status: this.client.status,
-				ping,
-			};
+			return { connected: this.isConnected, status: this.client.status, ping };
 		} catch (error) {
 			return {
 				connected: false,
@@ -167,9 +157,15 @@ export class RedisClient extends EventEmitter {
 	}
 
 	async disconnect(): Promise<void> {
-		if (this.client) {
-			this.isConnected = false;
-			await this.client.disconnect();
+		if (this.client.status === 'end') return;
+
+		this.isConnected = false;
+
+		try {
+			await this.client.quit();
+		} catch (err) {
+			console.error(`[${this.clientName}] quit failed`, err);
+			this.client.disconnect();
 		}
 	}
 

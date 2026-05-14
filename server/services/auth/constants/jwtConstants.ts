@@ -1,4 +1,4 @@
 export const JWT_EXPIRE_TIMES = {
-	ACCESSTOKEN: '5m',
-	REFRESHTOKEN: '30d',
+	ACCESSTOKEN: '10s',
+	REFRESHTOKEN: '15s',
 } as const;

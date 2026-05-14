@@ -1,5 +1,5 @@
 import { RedisClient } from './RedisClient';
-import Redis, { RedisOptions } from 'ioredis';
+import { RedisOptions } from 'ioredis';
 
 export class RedisFactory {
 	private static instances = new Map<string, RedisClient>();
@@ -9,34 +9,22 @@ export class RedisFactory {
 		instanceKey: string = 'default',
 	): Promise<RedisClient> {
 		if (this.instances.has(instanceKey)) {
-			return this.instances.get(instanceKey)!;
+			throw new Error(
+				`Redis instance "${instanceKey}" already exists use getInstance() instead`,
+			);
 		}
 
-		const client = new RedisClient(config);
-		await client.connect();
-
+		const client = await RedisClient.create(config, instanceKey);
 		this.instances.set(instanceKey, client);
+
+		return this.instances.get(instanceKey)!;
+	}
+
+	static getInstance(instanceKey = 'default') {
+		const client = this.instances.get(instanceKey);
+		if (!client) {
+			throw new Error(`Redis not initialized: ${instanceKey} `);
+		}
 		return client;
-	}
-
-	static getInstance(instanceKey: string = 'default'): RedisClient | null {
-		return this.instances.get(instanceKey) || null;
-	}
-
-	static async disconnectAll(): Promise<void> {
-		const disconnectPromises = Array.from(this.instances.values()).map(
-			(client) => client.disconnect(),
-		);
-
-		await Promise.all(disconnectPromises);
-		this.instances.clear();
-	}
-
-	static async waitForAllConnections(timeoutMs: number = 10000): Promise<void> {
-		const waitPromises = Array.from(this.instances.values()).map((client) =>
-			client.waitForConnection(timeoutMs),
-		);
-
-		await Promise.all(waitPromises);
 	}
 }

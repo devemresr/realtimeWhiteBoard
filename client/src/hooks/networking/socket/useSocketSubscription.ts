@@ -35,11 +35,11 @@ const useSocketSubscription = (
 
 			case CanvasOperationType.ERASER:
 				// todo temp remove mock switch to a dedicated cursor
-				const mockEraser = {
-					...data,
-					points: data.points.map((p) => ({ ...p, brushSize: 1 })),
-				};
-				drawBroadcastPath(mockEraser);
+				// const mockEraser = {
+				// 	...data,
+				// 	points: data.points.map((p) => ({ ...p, brushSize: 1 })),
+				// };
+				// drawBroadcastPath(mockEraser);
 				break;
 			default:
 				logger.warn('Received packet with unknown type:', data);
@@ -79,9 +79,9 @@ const useSocketSubscription = (
 
 	useEffect(() => {
 		if (!socket) return;
-		socket.on(`${SocketEvent.BROADCAST_PACKET}`, handleMessage);
+		socket.on(`${SocketEvent.BROADCAST_OPERATION}`, handleMessage);
 		return () => {
-			socket.off(SocketEvent.BROADCAST_PACKET, handleMessage);
+			socket.off(SocketEvent.BROADCAST_OPERATION, handleMessage);
 		};
 	}, [socket, handleMessage]);
 

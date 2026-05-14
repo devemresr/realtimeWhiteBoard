@@ -38,7 +38,7 @@ const usePacketTransmitter = (
 			);
 			try {
 				const result = await emit(
-					SocketEvent.SEND_PACKET,
+					SocketEvent.CANVAS_OPERATION,
 					toNetworkDrawingPacket(packet),
 					{
 						onSent: () =>
@@ -78,7 +78,7 @@ const usePacketTransmitter = (
 			try {
 				// todo switch to passing the actual roomId
 				const data = { ...packet, roomId: 'room2' };
-				await emit(SocketEvent.SEND_PACKET, data);
+				await emit(SocketEvent.CANVAS_OPERATION, data);
 			} catch (e) {
 				logger.error('CanvasEvent send failed', {
 					canvasMessageId: packet.canvasMessageId,

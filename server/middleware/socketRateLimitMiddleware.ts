@@ -1,5 +1,5 @@
 import { NextFunction } from 'express';
-import TokenBucket from '../services/TokenBucket';
+import TokenBucket from '../services/rate-limit/TokenBucket';
 import { Socket } from 'socket.io';
 import { error } from 'console';
 
@@ -16,7 +16,7 @@ class RateLimitError extends Error {
 const socketRateLimitMiddleware = (
 	socket: Socket,
 	tokenBucket: TokenBucket,
-	next: any
+	next: any,
 ) => {
 	return async (packet: any[], next: (err?: RateLimitError) => void) => {
 		const result = await tokenBucket.spendToken();
@@ -26,8 +26,8 @@ const socketRateLimitMiddleware = (
 			return next(
 				new RateLimitError(
 					result.retryAfter ?? 0,
-					result.error ?? 'rate limit exceed'
-				)
+					result.error ?? 'rate limit exceed',
+				),
 			);
 		}
 		next();

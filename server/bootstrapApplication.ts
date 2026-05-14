@@ -1,87 +1,102 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HttpServer } from 'http';
-import SocketController from './controllers/socketController';
+import SocketController from 'controllers/socket/socket.controller';
 import { instrument } from '@socket.io/admin-ui';
-import TokenBucketManager from './services/TokenBucketManager';
+import TokenBucketManager from './services/rate-limit/TokenBucketManager';
 import { RedisFactory } from './services/redis/RedisFactory';
-import RedisStreamManager from './services/RedisStreamManager';
-import { SocketManager } from './controllers/socketManager';
+import RedisStreamManager from 'services/streams/RedisStreamManager';
+import { SocketManager } from 'controllers/socket/socketManager';
 import { RedisClients } from '@shared/constants/socketIoConstants';
-import mongoose from 'mongoose';
+import allowedOrigins from 'config/allowedOrigins';
+import TokenBlacklist from 'services/redis/TokenBlacklist';
 
 export async function bootstrapApplication(
 	serverReference: HttpServer,
 ): Promise<any> {
 	try {
+		console.log('process.env.NODE_ENV', process.env.NODE_ENV);
+
 		// Initialize Socket.IO
 		console.log('Initializing Socket.IO');
 		const io = new SocketIOServer(serverReference, {
+			// This CORS config applies to the Socket.IO handshake endpoint (/socket.io/*).
+			// Express CORS middleware does NOT run for this endpoint,
+			// so we must configure CORS separately for Socket.IO.
 			cors: {
-				// origin:
-				// 	process.env.NODE_ENV === 'development' ? true : [...allowedOrigins],
-				origin: true,
+				origin: (origin, callback) => {
+					if (!origin || process.env.NODE_ENV === 'development') {
+						return callback(null, true);
+					}
+
+					if (allowedOrigins.includes(origin)) {
+						return callback(null, true);
+					}
+
+					return callback(new Error(`Not allowed by CORS: ${origin}`));
+				},
 				methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
 				allowedHeaders: ['Content-Type'],
 				credentials: true,
-				// credentials true and origin * is not compatible with some browsers so we use true for allowing origins
 			},
 			transports: ['websocket', 'polling'],
 			allowEIO3: true,
 		});
 		console.log('Socket.IO initialized');
 
-		// Initialize Redis Adapter
-		console.log('Initializing Redis Adapter', process.env.REDIS_ADAPTER_PORT);
+		// initialize redis adapter
+		// Two separate Redis instances are used intentionally:
+		// 	 mainRedis: app-level data (streams, cache, etc.) used directly by the app
+		//   adapterRedis: isolated instance dedicated solely to Socket.io pub/sub
+		//   for syncing socket events across server nodes (horizontal scaling)
+		//   App code should never use adapterRedis directly.
+		console.log('Initializing Redis Adapter ');
 		const redisAdapterInstance = await RedisFactory.createClient(
 			{
-				host: process.env.REDIS_ADAPTER_HOST || 'localhost',
+				host: process.env.REDIS_ADAPTER_HOST || '127.0.0.1',
 				port: parseInt(process.env.REDIS_ADAPTER_PORT || '6380'),
 			},
 			RedisClients.ADAPTER,
 		);
-		redisAdapterInstance.on('error', (err) => console.error('adapter', err));
-		console.log('Redis Adapter initialized');
 
-		// initialize redis adapter
-		const socketManager = new SocketManager(
+		const socketManager = SocketManager.getInstance(
 			io,
-			redisAdapterInstance.getClient(),
+			redisAdapterInstance.getRawClient(),
 		);
 		await socketManager.initializeRedisAdapter();
 
 		// Initialize main Redis client (for streams + cache)
 		const redisMain = await RedisFactory.createClient(
 			{
+				host: process.env.REDIS_HOST || '127.0.0.1',
 				port: parseInt(process.env.REDIS_PORT || '6379'),
 			},
-
 			RedisClients.MAIN,
 		);
-		redisMain.on('error', (err) => console.error('redisMain', err));
 
-		// await redisAdapterInstance.getClient().flushall();
-		// await redisMain.getClient().flushall();
+		// await redisAdapterInstance.getRawClient().flushall();
+		// await redisMain.getRawClient().flushall();
 		// clearAllCollections();
 		// return;
 
-		async function clearAllCollections() {
-			const collections = await mongoose.connection.db
-				.listCollections()
-				.toArray();
-			console.log('collections: ', collections);
+		// async function clearAllCollections() {
+		// 	const collections = await mongoose.connection.db
+		// 		.listCollections()
+		// 		.toArray();
+		// 	console.log('collections: ', collections);
 
-			for (const collectionInfo of collections) {
-				const collectionName = collectionInfo.name;
-				const collection = mongoose.connection.db.collection(collectionName);
+		// 	for (const collectionInfo of collections) {
+		// 		const collectionName = collectionInfo.name;
+		// 		const collection = mongoose.connection.db.collection(collectionName);
 
-				await collection.deleteMany({});
-				console.log(`Cleared: ${collectionName}`);
-			}
-		}
+		// 		await collection.deleteMany({});
+		// 		console.log(`Cleared: ${collectionName}`);
+		// 	}
+		// }
 
 		// Initialize services
-		const tokenBucketManager = new TokenBucketManager(redisMain.getClient());
-		const redisStreamManager = new RedisStreamManager(redisMain.getClient());
+		const tokenBucketManager = new TokenBucketManager(redisMain.getRawClient());
+		const redisStreamManager = new RedisStreamManager(redisMain.getRawClient());
+		const tokenBlacklist = new TokenBlacklist(redisMain.getRawClient());
 
 		// Initialize Socket Controller
 		const socketController = new SocketController(
@@ -90,10 +105,7 @@ export async function bootstrapApplication(
 			tokenBucketManager,
 		);
 
-		io.on(
-			'connection',
-			socketController.handleConnection.bind(socketController),
-		);
+		socketController.handleConnection();
 
 		// Setup admin UI
 		// todo add auth
@@ -108,6 +120,7 @@ export async function bootstrapApplication(
 			socketController,
 			redisStreamManager,
 			tokenBucketManager,
+			tokenBlacklist,
 			redisMain,
 			redisAdapterInstance,
 		};

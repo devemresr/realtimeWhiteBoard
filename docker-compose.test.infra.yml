@@ -1,0 +1,64 @@
+services:
+  redis_test:
+    image: redis:alpine
+    container_name: redis_test
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_test_data:/data
+    restart: unless-stopped
+    networks:
+      - test_network
+
+  # Redis Adapter (Socket.IO adapter)
+  redis_adapter_test:
+    image: redis:alpine
+    container_name: redis_adapter_test
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis_adapter_test_data:/data
+    restart: unless-stopped
+    networks:
+      - test_network
+
+  mongo:
+    image: mongo:7
+    container_name: mongo_test
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_test_data:/data/db
+    networks:
+      - test_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=myapp_test
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+
+  mongo_test_init:
+    image: mongo:7
+    depends_on:
+      mongo:
+        condition: service_healthy # wait for healthcheck, not just "started"
+    restart: "no"
+    networks:
+      - test_network
+    entrypoint: >
+      bash -c "sleep 5 && mongosh --host mongo_test:27017 --eval \"rs.initiate({_id: 'rs0', members: [{_id: 0, host:
+      'mongo_test:27017'}]})\""
+
+volumes:
+  redis_test_data:
+  redis_adapter_test_data:
+  mongodb_test_data:
+
+networks:
+  test_network:
+    driver: bridge
