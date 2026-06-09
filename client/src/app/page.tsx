@@ -11,7 +11,6 @@ const whiteBoardApp = () => {
 	const [connected, setConnected] = useState(false);
 	const [socketId, setSocketId] = useState('');
 	const [error, setError] = useState<string | null>(null);
-
 	// Ref to store the latest connected state (avoids stale closure)
 	const connectedRef = useRef(connected);
 	useEffect(() => {

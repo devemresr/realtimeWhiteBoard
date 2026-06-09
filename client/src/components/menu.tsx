@@ -64,7 +64,7 @@ export default function Menu() {
 			</button>
 			{menuOpen && (
 				<div
-					style={{ width: 220 }}
+					style={{ width: 220, zIndex: 100 }}
 					className='container fixed left-2 top-12 bg-white border rounded-lg border-gray-200 p-2 shadow flex flex-col gap-1'
 				>
 					{menuElementsConfig.map((e) => (

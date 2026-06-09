@@ -27,6 +27,8 @@ import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
 import { useEraserManager } from '../hooks/canvas/drawing/useEraserManager';
 import { useCollisionDetection } from '../hooks/canvas/drawing/useCollisionDetection';
 import logger from '../util/logger';
+import AttendeeList from './attendeeList';
+import { canvasBarItems, cursors } from './config';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -154,65 +156,72 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		const currentTool = tools[selectedElement];
 		currentTool?.endInteraction?.();
 	};
-
+	const cursor = canvasBarItems.find(
+		(item) => item.key === selectedElement,
+	).cursor;
 	return (
-		<>
-			<div className='flex relative'>
-				<Menu />
-				<CanvasBar
-					setSelectedElement={setSelectedElement}
-					selectedElement={selectedElement}
-					clearCanvas={clearCanvas}
-					isLogging={isLogging}
-					setIsLogging={setIsLogging}
-				/>
-				<CanvasSideBar
-					selectedElement={selectedElement}
-					brushColor={brushColor}
-					setBrushColor={setBrushColor}
-					brushSize={brushSize}
-					setBrushSize={setBrushSize}
-					brushShape={brushShape}
-					setBrushShape={setBrushShape}
-					textStyle={textStyle}
-					setTextStyle={setTextStyle}
-				/>
+		<div className='flex relative'>
+			<style>
+				{` /* Apply custom cursor to canvas */
+          canvas {
+            cursor: ${cursors[cursor]}, auto;
+          }
+        `}
+			</style>
+			<Menu />
+			<CanvasBar
+				setSelectedElement={setSelectedElement}
+				selectedElement={selectedElement}
+				clearCanvas={clearCanvas}
+				isLogging={isLogging}
+				setIsLogging={setIsLogging}
+			/>
+			<CanvasSideBar
+				selectedElement={selectedElement}
+				brushColor={brushColor}
+				setBrushColor={setBrushColor}
+				brushSize={brushSize}
+				setBrushSize={setBrushSize}
+				brushShape={brushShape}
+				setBrushShape={setBrushShape}
+				textStyle={textStyle}
+				setTextStyle={setTextStyle}
+			/>
+			<AttendeeList />
+			<canvas
+				onContextMenu={(e) => e.preventDefault()}
+				aria-label='canvas'
+				ref={canvasRef}
+				width={1800}
+				height={1000}
+				onPointerDown={startInteraction}
+				onPointerMove={(e) => {
+					interact(e);
+					updateMousePosition(e);
+				}}
+				onPointerUp={stopInteraction}
+				onPointerLeave={stopInteraction}
+				style={{ touchAction: 'none' }} // prevents default touch behaviors
+				// todo custom cursors based on tools
+				className='border border-gray-300'
+			/>
 
-				<canvas
-					onContextMenu={(e) => e.preventDefault()}
-					aria-label='canvas'
-					ref={canvasRef}
-					width={1800}
-					height={1000}
-					onPointerDown={startInteraction}
-					onPointerMove={(e) => {
-						interact(e);
-						updateMousePosition(e);
+			{isLogging && (
+				<div
+					style={{
+						position: 'fixed',
+						left: mousePos.x,
+						top: mousePos.y,
+						background: 'black',
+						color: 'white',
+						padding: '4px 8px',
+						borderRadius: '4px',
+						pointerEvents: 'none',
 					}}
-					onPointerUp={stopInteraction}
-					onPointerLeave={stopInteraction}
-					style={{ touchAction: 'none' }} // prevents default touch behaviors
-					// todo custom cursors based on tools
-					className='cursor-crosshair border border-gray-300'
-				/>
-
-				{isLogging && (
-					<div
-						style={{
-							position: 'fixed',
-							left: mousePos.x,
-							top: mousePos.y,
-							background: 'black',
-							color: 'white',
-							padding: '4px 8px',
-							borderRadius: '4px',
-							pointerEvents: 'none',
-						}}
-					>
-						x: {mousePos.x}, y: {mousePos.y}
-					</div>
-				)}
-			</div>
-		</>
+				>
+					x: {mousePos.x}, y: {mousePos.y}
+				</div>
+			)}
+		</div>
 	);
 }
