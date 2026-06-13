@@ -4,6 +4,7 @@ import { FaTrashAlt } from 'react-icons/fa';
 import { PiUsersThree } from 'react-icons/pi';
 export default function AttendeeList() {
 	const [active, setActive] = useState(false);
+	const [online, setOnline] = useState(false); // only render if its collaborated on
 	const user = {
 		id: 'u001',
 		username: 'teacher_jane',
@@ -96,7 +97,7 @@ export default function AttendeeList() {
 		// todo kick  user
 	};
 
-	return (
+	return !online ? null : (
 		<>
 			<button
 				onClick={() => setActive(!active)}

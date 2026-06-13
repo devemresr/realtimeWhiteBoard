@@ -1,8 +1,16 @@
 import { create } from 'zustand';
+import { UserActions, UserState } from './types';
 
-const useUserStore = create((set) => ({
-	bears: 0,
-	increasePopulation: () => set((state) => ({ bears: state.bears + 1 })),
-	removeAllBears: () => set({ bears: 0 }),
-	updateBears: (newBears) => set({ bears: newBears }),
-})); // example olarak bıraktım
+const initialState: UserState = {
+	id: '',
+	name: '',
+	username: '',
+	email: '',
+	avatar: '',
+};
+
+export const useUserStore = create<UserState & UserActions>((set) => ({
+	...initialState,
+	setUser: (user) => set(() => ({ ...user })),
+	resetUser: () => set(() => initialState),
+}));

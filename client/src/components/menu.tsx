@@ -5,10 +5,15 @@ import {
 	InfoSVG,
 	MenuSVG,
 	MessageSVG,
+	UsersSVG,
 	UserSVG,
 } from '../constants/svgs';
+import { useModalStore } from 'src/store/ModalStore';
+import AuthModal from 'src/modals/authModal';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [loggedIn, setLoggedIn] = useState(false);
+	const modalStore = useModalStore();
 	const color = '#2f2f2f';
 	const menuElementsConfig = [
 		{
@@ -16,35 +21,49 @@ export default function Menu() {
 			icon: <DownloadSVG color={color} props={{ width: 28 }} />,
 			title: 'Save to...',
 			subtitle: '',
-			trigger: '',
+			trigger: () => {},
 		},
 		{
 			key: 'open',
 			icon: <FolderSVG color={color} props={{ width: 24 }} />,
 			title: 'Open',
 			subtitle: 'Ctrl+O',
-			trigger: '',
+			trigger: () => {},
+		},
+		{
+			key: 'authenticate',
+			icon: <UserSVG color={color} props={{ width: 28 }} />,
+			title: 'Sign In',
+			subtitle: '',
+			trigger: () => modalStore.openModal({ extra: <AuthModal /> }),
 		},
 		{
 			key: 'live',
-			icon: <UserSVG color={color} props={{ width: 28 }} />,
+			icon: <UsersSVG color={color} props={{ width: 28 }} />,
 			title: 'Live collaboration...',
 			subtitle: '',
-			trigger: '',
+			trigger: () =>
+				loggedIn
+					? modalStore.openModal({
+							title: 'Collaborate',
+							text: 'test',
+							extra: <></>,
+						})
+					: modalStore.openModal({ extra: <AuthModal /> }),
 		},
 		{
 			key: 'help',
 			icon: <InfoSVG color={color} props={{ width: 26 }} />,
 			title: 'Help',
 			subtitle: '?',
-			trigger: '',
+			trigger: () => {},
 		},
 		{
 			key: 'language',
 			icon: <MessageSVG color={color} props={{ width: 24 }} />,
 			title: 'Language',
 			subtitle: 'English',
-			trigger: '',
+			trigger: () => {},
 		},
 	];
 	return (
@@ -67,19 +86,25 @@ export default function Menu() {
 					style={{ width: 220, zIndex: 100 }}
 					className='container fixed left-2 top-12 bg-white border rounded-lg border-gray-200 p-2 shadow flex flex-col gap-1'
 				>
-					{menuElementsConfig.map((e) => (
-						<button
-							className='w-full rounded h-8 flex flex-row items-center gap-1 px-1 transition-colors hover:bg-purple-100'
-							onClick={() => e.trigger}
-							key={e.key}
-						>
-							{e.icon}
-							<span className='w-full flex flex-row justify-between'>
-								<p>{e.title}</p>
-								{e.subtitle && <p className='text-gray-400'>{e.subtitle}</p>}
-							</span>
-						</button>
-					))}
+					{menuElementsConfig.map((e) => {
+						const onClick = () => {
+							e.trigger?.();
+							setMenuOpen(false);
+						};
+						return (
+							<button
+								className='w-full rounded h-8 flex flex-row items-center gap-1 px-1 transition-colors hover:bg-purple-100'
+								onClick={onClick}
+								key={e.key}
+							>
+								{e.icon}
+								<span className='w-full flex flex-row justify-between'>
+									<p>{e.title}</p>
+									{e.subtitle && <p className='text-gray-400'>{e.subtitle}</p>}
+								</span>
+							</button>
+						);
+					})}
 				</div>
 			)}
 		</>

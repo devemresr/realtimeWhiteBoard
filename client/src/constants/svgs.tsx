@@ -459,6 +459,32 @@ export const UserSVG = ({
 	</svg>
 );
 
+export const UsersSVG = ({
+	props,
+	color,
+}: {
+	props?: SVGProps<SVGSVGElement>;
+	color?: string;
+}) => (
+	<svg
+		xmlns='http://www.w3.org/2000/svg'
+		fill='none'
+		viewBox='0 0 24 24'
+		{...props}
+	>
+		<g
+			stroke={color}
+			strokeLinecap='round'
+			strokeLinejoin='round'
+			strokeWidth={2}
+		>
+			<circle cx={9} cy={9} r={4} />
+			<path d='M16 19c0-3.314-3.134-6-7-6s-7 2.686-7 6M15 13a4 4 0 1 0-3-6.646' />
+			<path d='M22 19c0-3.314-3.134-6-7-6-.807 0-2.103-.293-3-1.235' />
+		</g>
+	</svg>
+);
+
 export const InfoSVG = ({
 	props,
 	color,
