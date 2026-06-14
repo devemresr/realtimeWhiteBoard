@@ -18,8 +18,11 @@ type MutationConfig<
 };
 
 export default function useApiMutation<
+	// shape of the data returned by the API response
 	TData = unknown,
+	// shape of the request body sent to the API (use void if no body needed)
 	TVariables = unknown,
+	// shape of the error returned by the API, defaults to ApiError
 	TError extends ApiError = ApiError,
 >(config: MutationConfig<TData, TVariables, TError>) {
 	return useMutation<TData, TError, TVariables>({

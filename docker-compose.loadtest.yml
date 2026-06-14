@@ -1,0 +1,63 @@
+services:
+  realtime_whiteboard:
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mongo_test_init:
+        condition: service_completed_successfully
+    build: .
+    expose:
+      - "3001"
+    environment:
+      - REDIS_HOST=redis_test
+      - REDIS_PORT=6379
+      - REDIS_ADAPTER_HOST=redis_adapter_test
+      - REDIS_ADAPTER_PORT=6379
+      - NODE_ENV=loadTest
+      - MONGODB_URI=mongodb://mongo:27017/myapp_test?replicaSet=rs0&directConnection=true
+      - PORT=3001
+      - ACCESS_TOKEN_SECRET=dev-access-secret
+      - REFRESH_TOKEN_SECRET=dev-refresh-secret
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/health || exit 1"]
+      interval: 5s
+      timeout: 8s
+      retries: 5
+      start_period: 15s # give the app time to boot before checks start
+    networks:
+      - test_network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "3001:80"
+    volumes:
+      - ./nginx.loadTest.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      realtime_whiteboard:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - test_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.loadTest.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    restart: unless-stopped
+    networks:
+      - test_network
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+volumes:
+  prometheus_data:
+
+networks:
+  test_network:
+    driver: bridge

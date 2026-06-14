@@ -11,35 +11,37 @@ import {
 } from 'tests/utils/authTestHelpers';
 import { setupIntegrationTest } from 'tests/utils/setupIntegrationTest';
 import request from 'supertest';
+import { AUTH_API } from 'constants/routes.constant';
 const { getServer } = setupIntegrationTest();
 
-describe('POST /api/auth/register', () => {
+describe('POST /auth/register', () => {
 	it('registers a new user and returns an access token + refresh cookie', async () => {
 		const { res, jwtCookie } = await registerAndGetTokens(getServer());
 		expect(res.status).toBe(200);
 		expect(res.body.accessToken).toBeDefined();
 		expect(jwtCookie).toMatch(/^jwt=/);
+
 		// HttpOnly so JS can't read it — verify the flag is set
 		expect(jwtCookie).toMatch(/HttpOnly/i);
 	});
+
 	it('rejects duplicate email with 409', async () => {
 		await registerAndGetTokens(getServer()); // first registration
 		const res = await request(getServer())
-			.post('/api/auth/register')
+			.post(AUTH_API.REGISTER)
 			.send(TEST_USER); // same email again
 		expect(res.status).toBe(409);
 	});
 });
 
-describe('POST /api/auth/login', () => {
+describe('POST /auth/login', () => {
 	beforeEach(async () => {
 		await registerAndGetTokens(getServer()); // seed a user to log in with
 	});
+
 	it('logs in with correct credentials', async () => {
 		await registerAndGetTokens(getServer()); // seed a user to log in with
-		const res = await request(getServer())
-			.post('/api/auth/login')
-			.send(TEST_USER);
+		const res = await request(getServer()).post(AUTH_API.LOGIN).send(TEST_USER);
 		expect(res.status).toBe(200);
 		expect(res.body.accessToken).toBeDefined();
 		const rawCookies: string[] | never | string =
@@ -51,41 +53,27 @@ describe('POST /api/auth/login', () => {
 				: [];
 		expect(cookies.some((c: string) => c.startsWith('jwt='))).toBe(true);
 	});
-	it('logs in with correct credentials', async () => {
-		const res = await request(getServer())
-			.post('/api/auth/login')
-			.send(TEST_USER);
-		expect(res.status).toBe(200);
-		expect(res.body.accessToken).toBeDefined();
-		const rawCookies: string[] | never | string =
-			res.headers['set-cookie'] ?? [];
-		const cookies: string[] = Array.isArray(rawCookies)
-			? rawCookies
-			: rawCookies
-				? [rawCookies]
-				: [];
-		expect(cookies.some((c: string) => c.startsWith('jwt='))).toBe(true);
-	});
+
 	it('rejects wrong password with 401', async () => {
 		const res = await request(getServer())
-			.post('/api/auth/login')
+			.post(AUTH_API.LOGIN)
 			.send({ email: TEST_USER.email, password: 'wrongpassword' });
 		expect(res.status).toBe(401);
 	});
+
 	it('rejects non-existent user with 404', async () => {
 		const res = await request(getServer())
-			.post('/api/auth/login')
+			.post(AUTH_API.LOGIN)
 			.send({ email: 'ghost@test.com', password: 'whatever' });
 		expect(res.status).toBe(404);
 	});
 });
 
-describe('POST /api/auth/test — token verification + refresh flow', () => {
+describe('POST /auth/test — token verification + refresh flow', () => {
 	it('valid access token — request passes through', async () => {
 		const { accessToken, jwtCookie } = await registerAndGetTokens(getServer());
-
 		const res = await request(getServer())
-			.post('/api/auth/test')
+			.post('/auth/test')
 			.set('Authorization', `Bearer ${accessToken}`)
 			.set('Cookie', jwtCookie);
 
@@ -99,12 +87,13 @@ describe('POST /api/auth/test — token verification + refresh flow', () => {
 		await wait(600);
 
 		const res = await request(getServer())
-			.post('/api/auth/test')
+			.post('/auth/test')
 			.set('Authorization', `Bearer ${accessToken}`)
 			.set('Cookie', jwtCookie); // refresh token still valid (mocked to 2s)
 
 		expect(res.status).toBe(200);
 		// Middleware attaches the new token — adjust this to however your
+
 		// protectedd handler forwards it (response header, body, etc.)
 		expect(res.body.accessToken).toBeDefined();
 		expect(res.body.accessToken !== accessToken).toBeDefined();
@@ -117,7 +106,7 @@ describe('POST /api/auth/test — token verification + refresh flow', () => {
 		await wait(2500);
 
 		const res = await request(getServer())
-			.post('/api/auth/test')
+			.post('/auth/test')
 			.set('Authorization', `Bearer ${accessToken}`)
 			.set('Cookie', jwtCookie);
 
@@ -132,7 +121,7 @@ describe('POST /api/auth/test — token verification + refresh flow', () => {
 
 		// No Cookie header at all — createVerifyJWT short-circuits immediately
 		const res = await request(getServer())
-			.post('/api/auth/test')
+			.post('/auth/test')
 			.set('Authorization', `Bearer ${accessToken}`);
 		// deliberately no .set('Cookie', ...)
 
@@ -142,7 +131,7 @@ describe('POST /api/auth/test — token verification + refresh flow', () => {
 
 	it('no token at all — 401', async () => {
 		// No Authorization header, no Cookie
-		const res = await request(getServer()).post('/api/auth/test');
+		const res = await request(getServer()).post('/auth/test');
 
 		expect(res.status).toBe(401);
 	});
@@ -151,16 +140,17 @@ describe('POST /api/auth/test — token verification + refresh flow', () => {
 		const { jwtCookie } = await registerAndGetTokens(getServer());
 
 		const res = await request(getServer())
-			.post('/api/auth/test')
+			.post('/auth/test')
 			.set('Authorization', 'Bearer this.is.malformedToken')
 			.set('Cookie', jwtCookie);
 
 		expect(res.status).toBe(200);
 		expect(res.body.accessToken).toBeDefined();
 	});
+
 	it('malformed access token with no refresh token — 401', async () => {
 		const res = await request(getServer())
-			.post('/api/auth/test')
+			.post('/auth/test')
 			.set('Authorization', 'Bearer this.is.malformedToken');
 		// no cookie at all
 

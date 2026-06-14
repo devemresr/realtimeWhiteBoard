@@ -5,8 +5,8 @@ import { instrument } from '@socket.io/admin-ui';
 import TokenBucketManager from './services/rate-limit/TokenBucketManager';
 import { RedisFactory } from './services/redis/RedisFactory';
 import RedisStreamManager from 'services/streams/RedisStreamManager';
-import { SocketManager } from 'controllers/socket/socketManager';
-import { RedisClients } from '@shared/constants/socketIoConstants';
+import { AdapterManager } from 'controllers/socket/adapterManager';
+import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 import allowedOrigins from 'config/allowedOrigins';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
 
@@ -38,7 +38,12 @@ export async function bootstrapApplication(
 				allowedHeaders: ['Content-Type'],
 				credentials: true,
 			},
-			transports: ['websocket', 'polling'],
+			// transports:
+			// 	process.env.NODE_ENV === 'loadTest'
+			// 		? ['websocket']
+			// 		: ['polling', 'websocket'],
+			transports: ['polling', 'websocket'],
+			// upgradeTimeout: 100, // upgrade to websocket almost immediately
 			allowEIO3: true,
 		});
 		console.log('Socket.IO initialized');
@@ -49,7 +54,10 @@ export async function bootstrapApplication(
 		//   adapterRedis: isolated instance dedicated solely to Socket.io pub/sub
 		//   for syncing socket events across server nodes (horizontal scaling)
 		//   App code should never use adapterRedis directly.
-		console.log('Initializing Redis Adapter ');
+		console.log(
+			'Initializing Redis Adapter port:',
+			process.env.REDIS_ADAPTER_PORT,
+		);
 		const redisAdapterInstance = await RedisFactory.createClient(
 			{
 				host: process.env.REDIS_ADAPTER_HOST || '127.0.0.1',
@@ -58,7 +66,7 @@ export async function bootstrapApplication(
 			RedisClients.ADAPTER,
 		);
 
-		const socketManager = SocketManager.getInstance(
+		const socketManager = AdapterManager.getInstance(
 			io,
 			redisAdapterInstance.getRawClient(),
 		);
@@ -103,6 +111,8 @@ export async function bootstrapApplication(
 			io,
 			redisStreamManager,
 			tokenBucketManager,
+			tokenBlacklist,
+			redisMain.getRawClient(),
 		);
 
 		socketController.handleConnection();

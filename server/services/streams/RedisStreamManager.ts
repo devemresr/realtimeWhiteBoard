@@ -1,7 +1,11 @@
 import Redis from 'ioredis';
-import { RedisStream, REDIS_KEYS } from '@shared/constants/socketIoConstants';
+import {
+	REDIS_KEYS,
+	RedisStream,
+} from 'controllers/constants/cacheKeys.constant';
 import { CanvasOperation } from '@/types';
 import { addToStreamAndDedup } from 'scripts/addToStreamAndDedup';
+import logger from '@shared/util/logger';
 
 interface StreamOptions {
 	maxLen?: number;
@@ -63,10 +67,13 @@ class RedisStreamManager {
 		}
 
 		let canvasMessageIds: string[] = [];
+		const log = logger.child({ method: 'addMessageToStream' });
+		log.debug({ data });
+
+		const { authorId, roomId } = data;
 		const fieldValuePairs = Object.entries(data).flatMap(([key, value]) => {
-			if (key === this.MESSAGE_KEY) {
-				canvasMessageIds.push(value as string);
-			}
+			log.debug({ key, value });
+			if (key === this.MESSAGE_KEY) canvasMessageIds.push(value as string);
 			return [
 				key,
 				typeof value === 'object' && value !== null
@@ -74,14 +81,20 @@ class RedisStreamManager {
 					: String(value ?? ''),
 			];
 		});
+
+		if (!roomId) throw new Error('roomId is required for dedup');
+		if (!authorId) throw new Error('authorId is required');
+
 		let redisMessageId: string | null;
 		try {
 			redisMessageId = (await this.redis.eval(
 				addToStreamAndDedup,
-				2,
+				3,
 				this.streamName!,
-				REDIS_KEYS.dedupKey(this.streamName!),
+				REDIS_KEYS.dedupKey(roomId),
+				REDIS_KEYS.msgAuthorKey(roomId),
 				JSON.stringify(canvasMessageIds),
+				authorId,
 				...args,
 				...fieldValuePairs,
 			)) as string | null;

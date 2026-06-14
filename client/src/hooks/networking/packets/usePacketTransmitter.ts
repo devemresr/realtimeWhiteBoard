@@ -2,7 +2,10 @@
 
 import { useCallback } from 'react';
 import { Socket } from 'socket.io-client';
-import { SocketEvent } from '@shared/constants/socketIoConstants';
+import {
+	CLIENT_EVENTS,
+	SERVER_EVENTS,
+} from '../../../../../shared/constants/socketIo.constant';
 import logger from '../../../util/logger';
 import {
 	MessageStatus,
@@ -38,7 +41,7 @@ const usePacketTransmitter = (
 			);
 			try {
 				const result = await emit(
-					SocketEvent.CANVAS_OPERATION,
+					CLIENT_EVENTS.CANVAS_OPERATION,
 					toNetworkDrawingPacket(packet),
 					{
 						onSent: () =>
@@ -78,7 +81,7 @@ const usePacketTransmitter = (
 			try {
 				// todo switch to passing the actual roomId
 				const data = { ...packet, roomId: 'room2' };
-				await emit(SocketEvent.CANVAS_OPERATION, data);
+				await emit(CLIENT_EVENTS.CANVAS_OPERATION, data);
 			} catch (e) {
 				logger.error('CanvasEvent send failed', {
 					canvasMessageId: packet.canvasMessageId,

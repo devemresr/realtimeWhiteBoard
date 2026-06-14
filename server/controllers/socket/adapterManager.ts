@@ -2,8 +2,8 @@ import { createAdapter } from '@socket.io/redis-adapter';
 import Redis from 'ioredis';
 import { Server } from 'socket.io';
 
-export class SocketManager {
-	private static instance: SocketManager | null = null;
+export class AdapterManager {
+	private static instance: AdapterManager | null = null;
 
 	private subClient: any;
 	private pubClient: any;
@@ -15,14 +15,14 @@ export class SocketManager {
 		this.io = io;
 	}
 
-	static getInstance(io?: Server, redis?: Redis): SocketManager {
+	static getInstance(io?: Server, redis?: Redis): AdapterManager {
 		if (!this.instance) {
 			if (!io || !redis) {
 				throw new Error(
-					'SocketManager must be initialized with io and redis on first call',
+					'AdapterManager must be initialized with io and redis on first call',
 				);
 			}
-			this.instance = new SocketManager(io, redis);
+			this.instance = new AdapterManager(io, redis);
 		}
 		return this.instance;
 	}
@@ -37,7 +37,7 @@ export class SocketManager {
 	 * affecting the pub client, which needs to stay free for regular commands.
 	 *
 	 * Once set on `io`, the adapter is referenced internally by Socket.io -
-	 * the SocketManager instance does not need to be kept alive for this to work.
+	 * the AdapterManager instance does not need to be kept alive for this to work.
 	 */
 	public async initializeRedisAdapter() {
 		try {
@@ -46,22 +46,20 @@ export class SocketManager {
 			// duplicate() inherits connection options but creates a fresh
 			// client - needed because sub mode blocks the connection for
 			// pub/sub only, so pub and sub must be separate clients.
-			this.subClient = this.pubClient.duplicate();
+			this.subClient = this.pubClient.duplicate({ lazyConnect: true }); // no auto-connect
+
 			this.pubClient.on('error', (err: Error) =>
 				console.error('Redis adapter pub error:', err),
 			);
 			this.subClient.on('error', (err: Error) =>
 				console.error('Redis adapter sub error:', err),
 			);
-			// Connect the subClient
 			this.subClient.on('ready', () => {
 				console.log('subClient is ready');
 			});
-			// await this.subClient.connect();
+			// Connect the subClient
+			await this.subClient.connect();
 			this.io.adapter(createAdapter(this.pubClient, this.subClient));
-			this.subClient.on('error', (err: any) =>
-				console.error('subClient error:', err),
-			);
 			console.log('Redis adapter initialized successfully');
 		} catch (error) {
 			console.error('Failed to initialize Redis adapter:', error);
@@ -75,6 +73,6 @@ export class SocketManager {
 		await this.subClient?.quit();
 		this.subClient = null;
 		this.pubClient = null; // dereference only, do not quit
-		SocketManager.instance = null;
+		AdapterManager.instance = null;
 	}
 }

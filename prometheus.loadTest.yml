@@ -1,15 +1,12 @@
 global:
-  scrape_interval: 15s
+  scrape_interval: 5s
   evaluation_interval: 15s
 
 scrape_configs:
   - job_name: 'node_backend'
     static_configs:
       - targets:
-          - 'node_app_1:3001'
-          - 'node_app_2:3002'
-          - 'node_app_3:3003'
-          - 'node_app_4:3004'
+          - 'realtime_whiteboard:3001'
     metrics_path: '/metrics'
 
   - job_name: 'prometheus'

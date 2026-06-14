@@ -5,14 +5,10 @@ export const handleRoomLeave =
 	(socket: Socket) =>
 	async (payload: { roomId: string }, callback: Callback) => {
 		try {
-			socket.leave(roomId);
-			socketLog.info({ roomId }, 'Socket left room');
+			socket.leave(payload.roomId);
+			// socketLog.info({ roomId }, 'Socket left room');
 			return callback({ success: true });
 		} catch (error) {
 			return callback({ success: false, error: 'err' });
 		}
 	};
-
-export const handleJoinRoom =
-	(socket: Socket) =>
-	async (payload: { roomId: string }, callback: Callback) => {};

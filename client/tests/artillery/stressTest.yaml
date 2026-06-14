@@ -1,89 +1,85 @@
 config:
-  # NOTE:
-  # We use 127.0.0.1 instead of localhost to force IPv4 resolution.
-  # This avoids Socket.IO connection issues caused by environments where
-  # 'localhost' resolves to IPv6 (::1), which may not match the server binding.
-  # Using IPv4 ensures consistent handshake behavior for WebSocket + polling
-  # during load testing and prevents silent connection failures (e.g. xhr poll errors).
   target: 'http://127.0.0.1:3001'
+  processor: './artillery-functions.js'
+  payload:
+    path: './rooms.csv'
+    fields:
+      - roomId
+    order: sequence # each VU gets next room, cycles when exhausted
+    skipHeader: true
+  socketio:
+    transports: ['websocket', 'polling']
+    upgrade: false
   phases:
     - duration: 30
-      arrivalRate: 50
-      name: 'Low load'
+      arrivalRate: 67
+      name: 'Warm up' # 2000
+    - duration: 30
+      arrivalRate: 200
+      name: 'Medium load' # 6000
+    - duration: 30
+      arrivalRate: 400
+      name: 'High load' # 12000
     - duration: 60
-      arrivalRate: 100
-      name: 'Medium load'
-    - duration: 60
-      arrivalRate: 150
-      name: 'High load'
-  socketio:
-    timeout: 30000
-    reconnection: true
-    reconnectionAttempts: 5
-    reconnectionDelay: 1000
-    # debug: true
-
+      arrivalRate: 1000
+      name: 'Stress'
+  engines:
+    socketio:
+      timeout: 30000
   defaults:
     headers:
       Connection: 'keep-alive'
       User-Agent: 'Artillery-Test-{{ $uuid }}'
 
+before:
+  flow:
+    - post:
+        url: '/auth/login'
+        json:
+          email: 'loadtest@test.com'
+          password: 'testpassword'
+        capture:
+          - json: '$.accessToken'
+            as: 'authToken'
+        afterResponse: 'extractCookieAndUserId'
+
 scenarios:
   - name: 'stressTest'
     engine: socketio
     flow:
+      # - log: 'VU joining roomId: {{ roomId }}'
+      - emit:
+          channel: 'authenticate'
+          data:
+            token: '{{ authToken }}'
+      - think: 1
       - emit:
           channel: 'room:join'
-          data: 'test'
-          acknowledge:
-            match:
-              json: '$.success'
-              value: true
-            timeout: 5000
-
+          data:
+            roomId: '{{ roomId }}'
+      - think: 1
       - loop:
           - emit:
               channel: 'canvas:operation'
               data:
-                strokes:
-                  [
-                    {
-                      x: '{{ $randomNumber(100, 900) }}',
-                      y: '{{ $randomNumber(50, 500) }}',
-                      timestamp: '{{ $timestamp }}',
-                    },
-                    {
-                      x: '{{ $randomNumber(100, 900) }}',
-                      y: '{{ $randomNumber(50, 500) }}',
-                      timestamp: '{{ $timestamp }}',
-                    },
-                    {
-                      x: '{{ $randomNumber(100, 900) }}',
-                      y: '{{ $randomNumber(50, 500) }}',
-                      timestamp: '{{ $timestamp }}',
-                    },
-                    {
-                      x: '{{ $randomNumber(100, 900) }}',
-                      y: '{{ $randomNumber(50, 500) }}',
-                      timestamp: '{{ $timestamp }}',
-                    },
-                    {
-                      x: '{{ $randomNumber(100, 900) }}',
-                      y: '{{ $randomNumber(50, 500) }}',
-                      timestamp: '{{ $timestamp }}',
-                    },
-                  ]
                 strokeSequenceNumber: '{{ $loopCount }}'
+                strokes:
+                  - x: '{{ $randomNumber(0, 10) }}'
+                    y: '{{ $randomNumber(0, 10) }}'
+                    timestamp: '{{ $timestamp }}'
+                  - x: '{{ $randomNumber(0, 10) }}'
+                    y: '{{ $randomNumber(0, 10) }}'
+                    timestamp: '{{ $timestamp }}'
                 strokeId: '{{ $uuid }}'
+                canvasMessageId: '{{ $randomNumber(0,10000) }}-{{ userId }}'
                 category: 'drawing'
                 type: 'drawing'
                 packageSequenceNumber: '{{ $loopCount }}'
+                authorId: '{{ userId }}'
                 isLastPackage: false
-                roomId: 'room-{{ $randomNumber(1, 10) }}'
-              acknowledge:
-                match:
-                  json: '$.success'
-                  value: true
-                timeout: 5000
+                roomId: '{{ roomId }}'
           - think: 0.1
         count: 10
+      - emit:
+          channel: '__disconnect'
+          data: {}

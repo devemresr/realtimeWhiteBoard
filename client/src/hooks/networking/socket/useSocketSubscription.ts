@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect, useCallback } from 'react';
-import { SocketEvent } from '@shared/constants/socketIoConstants';
+import { SERVER_EVENTS } from '../../../../../shared/constants/socketIo.constant';
 import logger from '../../../util/logger';
 import { DrawBroadcastPathFn } from '../synchronization/useBroadcastPath';
 import {
@@ -34,7 +34,7 @@ const useSocketSubscription = (
 				break;
 
 			case CanvasOperationType.ERASER:
-				// todo temp remove mock switch to a dedicated cursor
+				// todo remove mock switch to a dedicated cursor
 				// const mockEraser = {
 				// 	...data,
 				// 	points: data.points.map((p) => ({ ...p, brushSize: 1 })),
@@ -79,9 +79,9 @@ const useSocketSubscription = (
 
 	useEffect(() => {
 		if (!socket) return;
-		socket.on(`${SocketEvent.BROADCAST_OPERATION}`, handleMessage);
+		socket.on(`${SERVER_EVENTS.BROADCAST_OPERATION}`, handleMessage);
 		return () => {
-			socket.off(SocketEvent.BROADCAST_OPERATION, handleMessage);
+			socket.off(SERVER_EVENTS.BROADCAST_OPERATION, handleMessage);
 		};
 	}, [socket, handleMessage]);
 

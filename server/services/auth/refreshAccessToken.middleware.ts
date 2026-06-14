@@ -1,8 +1,10 @@
 import { NextFunction, Request, Response } from 'express';
 import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
-import { generateAccessToken, TokenPayload } from './generateTokens.service';
+import { generateAccessToken } from './generateTokens.service';
+
 import pino from 'pino';
 import logger from '@shared/util/logger';
+import { TokenPayload } from '@shared/util/parseAccessToken';
 
 let log = logger.child({ method: 'refreshAccessToken' });
 

@@ -1,15 +1,7 @@
 import { Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
 import { JWT_EXPIRE_TIMES } from './constants/jwtConstants';
-
-// Decoded-token shape
-/** Minimal claims expected inside a valid refresh/access token. */
-export interface TokenPayload {
-	userId: string;
-	email: string;
-	jti: string;
-}
+const { nanoid } = require('nanoid');
 
 export const generateAccessToken = (userId: string, email: string) => {
 	if (!process.env.ACCESS_TOKEN_SECRET) {
@@ -19,7 +11,7 @@ export const generateAccessToken = (userId: string, email: string) => {
 		{
 			userId,
 			email,
-			jti: uuidv4(),
+			jti: nanoid(),
 		},
 		process.env.ACCESS_TOKEN_SECRET,
 		{ expiresIn: JWT_EXPIRE_TIMES.ACCESSTOKEN },
@@ -51,7 +43,7 @@ const generateRefreshToken = (userId: string, email: string) => {
 		{
 			userId,
 			email,
-			jti: uuidv4(),
+			jti: nanoid(),
 		},
 		process.env.REFRESH_TOKEN_SECRET,
 		{ expiresIn: JWT_EXPIRE_TIMES.REFRESHTOKEN },
