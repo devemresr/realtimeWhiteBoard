@@ -1,5 +1,5 @@
 import TokenBlacklist from 'services/redis/TokenBlacklist';
-import { MissingSecretError } from './refreshAccessToken.middleware';
+import { MissingSecretError } from './refreshAccessToken.service';
 import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import { TokenPayload } from '@shared/util/parseAccessToken';
 

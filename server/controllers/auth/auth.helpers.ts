@@ -11,8 +11,8 @@ import {
 	CACHE_KEYS_TTL,
 } from 'controllers/constants/cacheKeys.constant';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
-import refreshAccessToken from 'services/auth/refreshAccessToken.middleware';
-import createVerifyJWT from 'services/auth/verifyJWT.middleware';
+import refreshAccessToken from 'services/auth/refreshAccessToken.service';
+import createVerifyJWT from 'services/auth/verifyJWT.service';
 
 export const issueAuthResponse = (user: PublicUser, res: Response) => {
 	try {
@@ -23,6 +23,7 @@ export const issueAuthResponse = (user: PublicUser, res: Response) => {
 		setRefreshTokenCookie(userId, email, res);
 		return res.status(200).json({ accessToken });
 	} catch (error) {
+		// TODO: Replace this with a dedicated authError type
 		return res.status(500).json({ message: 'Authentication response failed' });
 	}
 };

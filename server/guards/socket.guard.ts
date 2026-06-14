@@ -3,7 +3,7 @@ import {
 	ClientEvent,
 } from '@shared/constants/socketIo.constant';
 import { RedisClients } from 'controllers/constants/cacheKeys.constant';
-import { isEventAllowed } from './authorization';
+import { adminOnlyEvents, isEventAllowed } from './authorization';
 import { Socket } from 'socket.io';
 import logger from '@shared/util/logger';
 import { canManageRoom, canPerformOperation } from './permissions';
@@ -79,7 +79,7 @@ export const socketGuard = <T extends SocketPayloadBase>(
 			} = payload;
 
 			// Fetch role directly from Redis don't trust the stale socket.data role
-			let actualRole = await redis.hget(
+			const actualRole = await redis.hget(
 				CACHE_KEYS.ROOM_ROLES(socketRoomId),
 				socketUserId,
 			);
@@ -181,6 +181,7 @@ export const socketGuard = <T extends SocketPayloadBase>(
 
 			// For admin-only events, verify the user is actually admin of this specific room
 			if (
+				!adminOnlyEvents.includes(eventName) &&
 				!(await canManageRoom<T>(
 					redis,
 					eventName,

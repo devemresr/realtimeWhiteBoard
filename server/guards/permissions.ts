@@ -1,6 +1,5 @@
 import { CACHE_KEYS, Role } from 'controllers/constants/cacheKeys.constant';
 import Redis from 'ioredis';
-import { adminOnlyEvents } from './authorization';
 
 export const canPerformOperation = (
 	socketUserId: string,
@@ -26,7 +25,6 @@ export const canManageRoom = async <
 	socketUserId: string,
 	socketRoomId: string,
 ) => {
-	if (!adminOnlyEvents.includes(eventName)) return true;
 	const isAdminOfTheRequestedRoom =
 		(await redis.hget(CACHE_KEYS.ROOM_ROLES(socketRoomId), socketUserId)) ===
 		Role.ADMIN;

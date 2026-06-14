@@ -55,7 +55,7 @@ class RedisStreamManager {
 		}
 
 		// Convert object to redis appropriate string
-		let args: string[] = ['*'];
+		const args: string[] = ['*'];
 
 		// MAXLEN options if needed
 		if (options.maxLen) {
@@ -114,7 +114,6 @@ class RedisStreamManager {
 			);
 		}
 
-		console.log('fieldValuePairs', fieldValuePairs, 'args', args);
 		console.log(
 			`Message added to stream '${this.streamName}' with ID: ${redisMessageId}`,
 		);

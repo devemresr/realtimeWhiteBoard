@@ -9,7 +9,7 @@ import RedisStreamManager from 'services/streams/RedisStreamManager';
 import TokenBucketManager from 'services/rate-limit/TokenBucketManager';
 import logger from '@shared/util/logger';
 import pino, { Logger } from 'pino';
-import { verifyAccessToken } from 'services/auth/verifyAccessToken';
+import { verifyAccessToken } from 'services/auth/verifyAccessToken.service';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
 import { runRedisCommandAndParse } from 'utils/parseRedisFields';
 import Redis from 'ioredis';
@@ -288,11 +288,11 @@ class SocketController {
 		const socketLog = this.log.child({ userId });
 		const usersBucket = this.tokenBucketManager.getOrCreateBucket(userId);
 		usersBucket.cleanup();
-		const { roomId } = socket.data?.roomId;
+		const roomId = socket.data?.roomId;
 		await this.redis.hdel(
 			CACHE_KEYS.ROOM_CONNECTED_USERS(roomId),
 			userId,
-			socket.id,
+			socket?.id,
 		);
 		socketLog.info('Cleaned up resources for socket');
 	}

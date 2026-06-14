@@ -32,6 +32,7 @@
 		"check:client": "tsc --project client/tsconfig.json --noEmit && eslint client/ shared/ --ext .ts,.tsx,.js,.jsx"
 	},
 	"devDependencies": {
+		"@eslint/js": "^9.39.4",
 		"@types/jest": "^30.0.0",
 		"@types/jsonwebtoken": "^9.0.10",
 		"@types/node": "^25.6.2",
@@ -46,7 +47,8 @@
 		"ts-jest": "^29.4.9",
 		"ts-node": "^10.9.2",
 		"tsx": "^4.20.3",
-		"typescript": "^6.0.3"
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.61.0"
 	},
 	"dependencies": {
 		"@smithy/config-resolver": "^4.5.2",
@@ -58,6 +60,7 @@
 		"@smithy/types": "^4.14.1",
 		"@smithy/util-retry": "^4.4.2",
 		"artillery-engine-socketio-v3": "^1.2.0",
+		"axios": "^1.17.0",
 		"eslint": "^9.39.4",
 		"jest": "^30.4.1",
 		"next": "^16.2.4",

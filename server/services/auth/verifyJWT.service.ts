@@ -1,14 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
 import logger from '@shared/util/logger';
-import { verifyAccessToken } from './verifyAccessToken';
+import { verifyAccessToken } from './verifyAccessToken.service';
 
 const extractBearerToken = (authHeader: string | undefined): string | null => {
 	if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
 	return authHeader.split(' ')[1] ?? null;
 };
-
-let log = logger.child({ method: 'createVerifyJWT' });
 
 /**
  * Factory that returns a JWT verification middleware bound to a TokenBlacklist instance.
