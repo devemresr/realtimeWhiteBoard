@@ -4,7 +4,7 @@ import { DrawingOperation, DrawingPoint, CanvasOperationType } from '@/types';
 import { ToolInstance } from 'src/types/tool.types';
 import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
 import { HandlePacketSendingFn } from '../../networking/packets/usePacketTransmitter';
-import { canvasState } from 'src/util/canvas/CanvasState';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 interface UseDrawToolProps {
 	brushColor: string;
@@ -122,7 +122,6 @@ export const useDrawTool = ({
 			brushSize,
 			brushColor,
 			roomPacketBuilder,
-			canvasState,
 			handlePacketSending,
 			drawIncrementalPath,
 		],
@@ -154,7 +153,7 @@ export const useDrawTool = ({
 
 		setIsDrawing(false);
 		strokePointsRef.current = [];
-	}, [isDrawing, roomPacketBuilder, canvasState, handlePacketSending]);
+	}, [isDrawing, roomPacketBuilder, handlePacketSending]);
 
 	return {
 		startInteraction,

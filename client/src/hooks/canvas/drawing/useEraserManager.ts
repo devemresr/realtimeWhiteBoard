@@ -3,7 +3,7 @@ import { DrawingPoint, EraserPoint, CanvasOperationType } from '@/types';
 import logger from '../../../util/logger';
 import { useCollisionDetection } from './useCollisionDetection';
 import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
-import { canvasState } from 'src/util/canvas/CanvasState';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 interface EraserManagerProps {
 	canvasWidth: number;

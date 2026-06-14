@@ -5,7 +5,7 @@ import { useReceivedPacketManager } from '../packets/useReceivedPacketManager';
 import { useGapHandler } from './useGapHandler';
 import { DrawIncrementalPathFn } from '../../canvas/drawing/useCanvasDrawing';
 import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
-import { canvasState } from 'src/util/canvas/CanvasState';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 export type DrawBroadcastPathFn = (packet: CanvasOperation) => void;
 

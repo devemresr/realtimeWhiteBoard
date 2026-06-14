@@ -5,7 +5,7 @@ import {
 	DrawingPoint,
 	MessageStatus,
 } from '@/types';
-import { BoundingBoxStore } from './state/BoundingBoxStore';
+import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
 
 /**

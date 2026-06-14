@@ -12,7 +12,7 @@ import {
 	CanvasOperation,
 } from '@/types';
 import { useSocketEmit } from '../socket/useSocketEmit';
-import { canvasState } from 'src/util/canvas/CanvasState';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 export type HandlePacketSendingFn = ReturnType<
 	typeof usePacketTransmitter
@@ -67,7 +67,7 @@ const usePacketTransmitter = (socket: Socket | null) => {
 				});
 			}
 		},
-		[socket, emit, canvasState],
+		[socket, emit],
 	);
 
 	const sendEventPacket = useCallback(
@@ -108,7 +108,7 @@ const usePacketTransmitter = (socket: Socket | null) => {
 		logger.debug(packetsToSend);
 		canvasState.getAllPacketsToSend().forEach(sendPacket);
 		return true;
-	}, [sendPacket, canvasState]);
+	}, [sendPacket]);
 
 	return {
 		handlePacketSending,

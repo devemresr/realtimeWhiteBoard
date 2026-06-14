@@ -7,7 +7,7 @@ import {
 	MessageStatus,
 } from '@/types';
 
-import { BoundingBoxStore } from './state/BoundingBoxStore';
+import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
 import { PacketStore } from './PacketStore';
 import { SpatialGrid } from './SpatialGrid';

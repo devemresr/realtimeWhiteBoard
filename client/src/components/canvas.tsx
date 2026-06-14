@@ -50,9 +50,10 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const {
 		clearCanvas,
 		drawDotOnCanvas,
-		drawPoints,
 		drawIncrementalPath,
 		getEnrichedInterpolatedPoints,
+		ctxRef,
+		updateContextProps,
 	} = useCanvasDrawing(canvasRef, {
 		brushColor,
 		brushSize,
@@ -95,7 +96,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	);
 
 	const eraserTool = useEraserTool({
-		canvasRef,
 		eraserSize: brushSize,
 		eraserManager,
 		roomPacketBuilder,
@@ -126,6 +126,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	}, []);
 
 	const startInteraction = (e: React.PointerEvent<HTMLCanvasElement>) => {
+		if (!ctxRef.current) return;
 		const currentTool = tools[selectedElement];
 		currentTool?.startInteraction?.(e);
 	};
@@ -185,7 +186,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				onPointerUp={stopInteraction}
 				onPointerLeave={stopInteraction}
 				style={{ touchAction: 'none' }} // prevents default touch behaviors
-				// todo custom cursors based on tools
 				className='border border-gray-300'
 			/>
 

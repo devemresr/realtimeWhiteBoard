@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { BoundingBox, DrawingPoint, EraserPoint } from '@/types';
 import logger from '../../../util/logger';
-import { canvasState } from 'src/util/canvas/CanvasState';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 export const useCollisionDetection = () => {
 	const distanceToLineSegment = useCallback(
