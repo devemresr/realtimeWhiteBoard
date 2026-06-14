@@ -1,4 +1,4 @@
-import { RedisClients } from '@shared/constants/socketIoConstants';
+import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 import { Server } from 'node:http';
 import { createServer } from 'http';
 import { gracefulShutdown, startServer } from '../../server';

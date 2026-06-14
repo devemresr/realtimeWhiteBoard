@@ -26,10 +26,7 @@ class TokenBucketManager {
 		};
 	}
 
-	// todo replace socketId with userId once auth is implemented
-	public getOrCreateBucket(socket: Socket): TokenBucket {
-		const userId = socket.data.userId || socket.id;
-
+	public getOrCreateBucket(userId: string): TokenBucket {
 		if (!this.tokenBuckets.has(userId)) {
 			const bucket = new TokenBucket(
 				this.redis,

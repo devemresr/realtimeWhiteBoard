@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import sanitizeAndDetect from './validateAndSanitize';
+import sanitizeAndDetect from './validateAndSanitize.middleware';
 import { NestedObject } from '../../shared/types/express';
 import logger from '@shared/util/logger';
 

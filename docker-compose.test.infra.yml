@@ -1,7 +1,6 @@
 services:
   redis_test:
     image: redis:alpine
-    container_name: redis_test
     ports:
       - "6381:6379"
     volumes:
@@ -13,7 +12,6 @@ services:
   # Redis Adapter (Socket.IO adapter)
   redis_adapter_test:
     image: redis:alpine
-    container_name: redis_adapter_test
     ports:
       - "6382:6379"
     volumes:
@@ -24,7 +22,6 @@ services:
 
   mongo:
     image: mongo:7
-    container_name: mongo_test
     ports:
       - "27018:27017"
     volumes:
@@ -38,8 +35,6 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
-    environment:
-      - MONGO_INITDB_DATABASE=myapp_test
     command: ["--replSet", "rs0", "--bind_ip_all"]
 
   mongo_test_init:
@@ -51,8 +46,16 @@ services:
     networks:
       - test_network
     entrypoint: >
-      bash -c "sleep 5 && mongosh --host mongo_test:27017 --eval \"rs.initiate({_id: 'rs0', members: [{_id: 0, host:
-      'mongo_test:27017'}]})\""
+      bash -c "
+        for i in \$(seq 1 10); do
+          mongosh --host mongo:27017 --eval \"
+            try { rs.status(); print('Already initialized.'); }
+            catch(e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}); print('Initialized.'); }
+          \" && exit 0;
+          echo 'Retrying in 3s...'; sleep 3;
+        done;
+        exit 1
+      "
 
 volumes:
   redis_test_data:

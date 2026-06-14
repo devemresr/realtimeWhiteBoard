@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import sanitizeQueryData from './sanitizeQueryData';
+import sanitizeQueryData from './sanitizeQueryData.middleware';
 import sanitize from 'mongo-sanitize';
 
 export const handleSanitization = (

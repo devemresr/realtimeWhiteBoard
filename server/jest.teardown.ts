@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
-import { SocketManager } from './controllers/socket/socketManager';
+import { AdapterManager } from 'controllers/socket/adapterManager';
 import { RedisFactory } from './services/redis/RedisFactory';
-import { RedisClients } from '../shared/constants/socketIoConstants';
+import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 
 export default async function globalTeardown() {
 	const errors: unknown[] = [];
 
-	await SocketManager.getInstance()
+	await AdapterManager.getInstance()
 		.quitSubClient()
 		.catch((err) => errors.push(err));
 

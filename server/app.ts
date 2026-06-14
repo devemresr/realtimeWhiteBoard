@@ -4,7 +4,7 @@ import corsOptions from './config/corsOptions';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { handleSanitization } from './middleware/handleSanitization';
+import { handleSanitization } from 'middleware/handleSanitization.middleware';
 
 const app = express();
 

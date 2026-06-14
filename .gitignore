@@ -7,6 +7,8 @@ server/node_modules
 /client/.env.production
 client/.next/
 client/out/
+server/wip/
+client/wip/
 
 
 /client/mocks

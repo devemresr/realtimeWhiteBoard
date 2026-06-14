@@ -1,12 +1,15 @@
 import pino from 'pino';
 
 const env = process.env.NODE_ENV;
+const isPrettyLog = process.env.NODE_ENV !== 'production';
 
 const logger = pino({
-	level: process.env.LOG_LEVEL || (env === 'development' ? 'debug' : 'info'),
+	level:
+		process.env.LOG_LEVEL ??
+		(env === 'development' || 'test' ? 'debug' : 'info'),
 
 	// Pretty printing for development
-	...(env === 'development' && {
+	...(isPrettyLog && {
 		transport: {
 			target: 'pino-pretty',
 			options: {

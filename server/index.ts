@@ -36,6 +36,18 @@ import app from 'app';
 const httpServer = createServer(app);
 (async () => {
 	try {
+		const test =
+			process.env.LOG_LEVEL ??
+			(process.env.NODE_ENV === 'development' ? 'debug' : 'info');
+		console.log(
+			'env:',
+			process.env.NODE_ENV,
+			'LOG_LEVEL: ',
+			test,
+			'MONGODB_URI: ',
+			process.env.MONGODB_URI,
+		);
+
 		await startServer(httpServer);
 	} catch (error) {
 		console.error('error at startServer:', error);

@@ -15,8 +15,6 @@ interface GapHandlerConfig {
 	permanentTimeout: number; // 1500ms - when to declare permanent
 	handleGapFilled: HandleGapFilledFn;
 	handleGapPermanent: HandleGapPermanentFn;
-	handleGapFilled: HandleGapFilledFn;
-	handleGapPermanent: HandleGapPermanentFn;
 	fetchPacket: (strokeId: string, sequence: number) => Promise<any>;
 }
 
@@ -89,7 +87,6 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 			});
 		},
 		[config],
-		[config],
 	);
 
 	const clearGapTimeout = useCallback((gapKey: string) => {
@@ -109,7 +106,6 @@ export const useGapHandler = (config: GapHandlerConfig) => {
 			const gapKey = getGapKey(strokeId, sequence);
 			clearGapTimeout(gapKey);
 		},
-		[clearGapTimeout],
 		[clearGapTimeout],
 	);
 

@@ -1,5 +1,3 @@
-'use client';
-
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 export type ApiError = {
@@ -58,8 +56,12 @@ export async function apiFetch<TData>(
 	});
 
 	if (!response.ok) {
+		const body = await response.json().catch(() => null);
 		const error: ApiError = {
-			message: `HTTP error! status: ${response.status}`,
+			message:
+				body?.error ||
+				body?.message ||
+				`HTTP error! status: ${response.status}`,
 			status: response.status,
 			statusText: response.statusText,
 		};

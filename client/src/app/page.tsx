@@ -2,13 +2,19 @@
 
 import { useState, useEffect, useRef, lazy } from 'react';
 import { io } from 'socket.io-client';
-import { SocketEvent } from '@shared/constants/socketIoConstants';
+import {
+	CLIENT_EVENTS,
+	SOCKET_LIFECYCLE_EVENTS,
+} from '../../../shared/constants/socketIo.constant';
 const Canvas = lazy(() => import('../components/canvas'));
 import { Socket } from 'socket.io-client';
 import { SOCKET_CONFIG } from 'src/constants/socket.config';
 const whiteBoardApp = () => {
 	const [socket, setSocket] = useState<Socket | null>(null);
 	const [connected, setConnected] = useState(false);
+	const [token, setToken] = useState<string | null>(
+		() => localStorage.getItem('accessToken'), // lazy init, matches what the socket already used
+	);
 	const [socketId, setSocketId] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	// Ref to store the latest connected state (avoids stale closure)
@@ -18,12 +24,15 @@ const whiteBoardApp = () => {
 	}, [connected]);
 
 	useEffect(() => {
-		console.log(
-			'process.env.NEXT_PUBLIC_GATEWAY_URL',
-			process.env.NEXT_PUBLIC_GATEWAY_URL,
-		);
+		const newSocket = io(
+			process.env.NEXT_PUBLIC_GATEWAY_URL!,
 
-		const newSocket = io(process.env.NEXT_PUBLIC_GATEWAY_URL!, SOCKET_CONFIG);
+			{
+				...SOCKET_CONFIG,
+				// todo change localstorage to zustand
+				auth: { token: localStorage.getItem('accessToken') },
+			},
+		);
 
 		setSocket(newSocket); // safe for children components
 
@@ -33,7 +42,8 @@ const whiteBoardApp = () => {
 			setSocketId(newSocket.id);
 			setError('connection error solved connected');
 
-			newSocket.emit(SocketEvent.JOIN_ROOM, 'room2', (ack: boolean) => {
+			// todo change it to emit actual roomId
+			newSocket.emit(CLIENT_EVENTS.JOIN_ROOM, { roomId: 'test' }, (ack) => {
 				console.log('Join room ack:', ack);
 			});
 		};
@@ -67,13 +77,19 @@ const whiteBoardApp = () => {
 			setError('Reconnection failed');
 		};
 
-		newSocket.on('connect', handleConnect);
-		newSocket.on('disconnect', handleDisconnect);
-		newSocket.on('connect_error', handleConnectError);
-		newSocket.on('error', handleError);
-		newSocket.on('reconnect_attempt', handleReconnectAttempt);
-		newSocket.on('reconnect_error', handleReconnectError);
-		newSocket.on('reconnect_failed', handleReconnectFailed);
+		newSocket.on(SOCKET_LIFECYCLE_EVENTS.CONNECT, handleConnect);
+		newSocket.on(SOCKET_LIFECYCLE_EVENTS.DISCONNECT, handleDisconnect);
+		newSocket.on(SOCKET_LIFECYCLE_EVENTS.CONNECT_ERROR, handleConnectError);
+		newSocket.on(SOCKET_LIFECYCLE_EVENTS.ERROR, handleError);
+		newSocket.on(
+			SOCKET_LIFECYCLE_EVENTS.RECONNECT_ATTEMPT,
+			handleReconnectAttempt,
+		);
+		newSocket.on(SOCKET_LIFECYCLE_EVENTS.RECONNECT_ERROR, handleReconnectError);
+		newSocket.on(
+			SOCKET_LIFECYCLE_EVENTS.RECONNECT_FAILED,
+			handleReconnectFailed,
+		);
 
 		return () => {
 			console.log('Cleaning up socket connection');
@@ -82,12 +98,15 @@ const whiteBoardApp = () => {
 		};
 	}, []);
 
-	return (
-		<>
-			{socket && <Canvas socket={socket} />}
-			{error && <div className='error'>Socket error: {error}</div>}
-		</>
-	);
+	useEffect(() => {
+		console.log(' token effect fired, token:', token, 'socket:', !!socket);
+		if (!socket || !token) return;
+		// just update auth on existing socket, don't recreate
+		socket.auth = { token };
+		socket.disconnect().connect(); // reconnect with new token
+	}, [token]); // token changes only trigger re-auth
+
+	return <>{socket && <Canvas socket={socket} />}</>;
 };
 
 export default whiteBoardApp;

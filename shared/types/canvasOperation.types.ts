@@ -1,13 +1,5 @@
-export interface BasePoint {
-	x: number;
-	y: number;
-	timestamp?: number;
-}
-
-export enum MessageCategory {
-	DRAWING = 'drawing',
-	EVENT = 'event',
-}
+import { MessageCategory, MessageStatus } from './message.types';
+import { DrawingPoint, EraserPoint, LassoPoint } from './points.types';
 
 export enum CanvasOperationType {
 	DRAWING = 'drawing',
@@ -15,41 +7,11 @@ export enum CanvasOperationType {
 	LASSO = 'lasso',
 }
 
-export enum EventType {
-	ERASE = 'erase',
-	USER_JOIN = 'user_join',
-	USER_LEAVE = 'user_leave',
-}
-
-export interface DrawingPoint extends BasePoint {
-	brushSize: number;
-	brushColor: string;
-}
-
-export interface EraserPoint extends BasePoint {
-	brushSize: number;
-}
-
-export interface LassoPoint extends BasePoint {
-	// not implemented yet
-}
-
 export type CanvasOperationTypeToPoints = {
 	[CanvasOperationType.DRAWING]: DrawingPoint;
 	[CanvasOperationType.ERASER]: EraserPoint;
 	[CanvasOperationType.LASSO]: LassoPoint;
 };
-
-export type CanvasPoint = EraserPoint | DrawingPoint | LassoPoint;
-export enum MessageStatus {
-	CREATED = 'CREATED', // Just created, not sent yet
-	SENDING = 'SENDING', // Currently being sent
-	SENT = 'SENT',
-	ACKNOWLEDGED = 'ACKNOWLEDGED', // Server sent back ack
-	RECEIVED = 'RECEIVED', // Received from another user
-	FAILED = 'FAILED', // Failed, will retry
-	ABANDONED = 'ABANDONED', // Max retries reached, gave up sending
-}
 
 /**
  * Base CanvasOperation interface containing all shared fields across CanvasOperation types.
@@ -108,29 +70,6 @@ interface BaseCanvasOperation {
  *   }
  * }
  */
-
-interface BaseCanvasEvent {
-	roomId: string;
-	authorId: string;
-	canvasMessageId: string;
-	category: MessageCategory.EVENT;
-	timestamp?: number;
-	status?: MessageStatus;
-}
-
-export type EraseEvent = BaseCanvasEvent & {
-	type: EventType.ERASE;
-	erasedStrokeIds: string[];
-};
-
-export type UserJoinEvent = BaseCanvasEvent & {
-	type: EventType.USER_JOIN;
-};
-
-export type UserLeaveEvent = BaseCanvasEvent & {
-	type: EventType.USER_LEAVE;
-};
-
 export type DrawingOperation = BaseCanvasOperation & {
 	type: CanvasOperationType.DRAWING;
 	points: DrawingPoint[]; // Must have brushSize and brushColor
@@ -140,6 +79,7 @@ export type EraserOperation = BaseCanvasOperation & {
 	type: CanvasOperationType.ERASER;
 	points: EraserPoint[]; // Must have brushSize only
 };
+
 export type LassoOperation = BaseCanvasOperation & {
 	type: CanvasOperationType.LASSO;
 	points: LassoPoint[]; // Just x, y coordinates
@@ -149,34 +89,3 @@ export type CanvasOperation =
 	| DrawingOperation
 	| EraserOperation
 	| LassoOperation;
-export type CanvasEvent = EraseEvent | UserJoinEvent | UserLeaveEvent;
-export type CanvasMessage = CanvasOperation | CanvasEvent;
-export type CanvasMessageType = EventType | CanvasOperationType;
-
-type ToConsumedCanvasMessage<T> = Omit<
-	T,
-	'status' | 'lastAttemptTimestamp' | 'timestamp'
-> & { redisMessageId: string };
-
-export type ConsumedCanvasOperation = ToConsumedCanvasMessage<CanvasOperation>;
-export type ConsumedCanvasEvent = ToConsumedCanvasMessage<CanvasEvent>;
-export type ConsumedCanvasMessage =
-	| ConsumedCanvasOperation
-	| ConsumedCanvasEvent;
-
-/**
- * Bounding box information for packets' point data.
- * Used for spatial indexing and collision detection.
- *
- * @remarks
- * Can be computed from a CanvasOperation's points to determine:
- * - Which strokes intersect with an eraser path
- * - Which strokes are within a lasso selection
- * - Efficient canvas viewport culling
- */
-export interface BoundingBox {
-	minX: number;
-	maxX: number;
-	minY: number;
-	maxY: number;
-}

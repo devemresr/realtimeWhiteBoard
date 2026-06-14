@@ -1,18 +1,25 @@
 import mongoose from 'mongoose';
 import { bootstrapApplication } from './bootstrapApplication';
 import authRoutes from './routes/authRoutes';
+import roomRoutes from './routes/roomRoutes';
 import app from './app';
 import { Server } from 'node:http';
 import { RedisFactory } from './services/redis/RedisFactory';
-import { RedisClients } from '@shared/constants/socketIoConstants';
+import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 import { Request, Response } from 'express';
-import { SocketManager } from 'controllers/socket/socketManager';
+import { AdapterManager } from 'controllers/socket/adapterManager';
+import { API_BASE_PATHS } from 'constants/routes.constant';
+import { register } from 'prom-client';
 
 const PORT = process.env.PORT || 3001;
 let shuttingDown = false;
 
 export async function startServer(httpServer: Server): Promise<Server> {
 	console.log('starting server');
+	console.log('process.env.MONGODB_URI', process.env.MONGODB_URI);
+	app.use('/health', (req: Request, res: Response) => {
+		res.status(200).json({ status: 'ok' });
+	});
 
 	// Start mongoDB
 	if (!process.env.MONGODB_URI) {
@@ -25,9 +32,12 @@ export async function startServer(httpServer: Server): Promise<Server> {
 
 	console.log('Bootstrapping application...');
 	const { tokenBlacklist } = await bootstrapApplication(httpServer);
-	app.use('/api/auth', authRoutes(tokenBlacklist));
-	app.use('/ping', (req: Request, res: Response) => {
-		return res.status(200).json({ success: true, msg: 'pong' });
+	app.use(API_BASE_PATHS.AUTH, authRoutes(tokenBlacklist));
+	app.use(API_BASE_PATHS.ROOM, roomRoutes(tokenBlacklist));
+
+	app.get('/metrics', async (req, res) => {
+		res.set('Content-Type', register.contentType);
+		res.send(await register.metrics());
 	});
 
 	await new Promise((resolve) => {
@@ -49,7 +59,7 @@ export async function gracefulShutdown(server?: Server) {
 
 	shuttingDown = true;
 	const errors: unknown[] = [];
-	console.log('gracefulShutdown started');
+	console.log('gracefulShutdown started', new Error().stack);
 
 	if (server) {
 		await new Promise<void>((resolve, reject) => {
@@ -57,13 +67,21 @@ export async function gracefulShutdown(server?: Server) {
 		}).catch((err) => errors.push(err));
 	}
 
-	await SocketManager.getInstance()
-		.quitSubClient()
-		.catch((err) => errors.push(err));
+	// In gracefulShutdown
+	const adapterManager = AdapterManager.getInstance(); // access static directly, no throw
+	if (adapterManager) {
+		await adapterManager.quitSubClient().catch((err) => errors.push(err));
+	}
+
+	const isProd = process.env.NODE_ENV === 'production';
 
 	await Promise.all([
-		RedisFactory.getInstance(RedisClients.MAIN).getRawClient().quit(),
-		RedisFactory.getInstance(RedisClients.ADAPTER).getRawClient().quit(),
+		RedisFactory.getInstance(RedisClients.MAIN)
+			.getRawClient()
+			[isProd ? 'quit' : 'disconnect'](), //quit waits till pending commands are done disconnect does not
+		RedisFactory.getInstance(RedisClients.ADAPTER)
+			.getRawClient()
+			[isProd ? 'quit' : 'disconnect'](),
 	]).catch((err) => errors.push(err));
 
 	if (mongoose.connection.readyState === 1) {

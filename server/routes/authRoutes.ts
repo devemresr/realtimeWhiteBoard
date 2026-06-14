@@ -1,19 +1,18 @@
 import { Router } from 'express';
 import login from 'controllers/auth/login.controller';
 import register from 'controllers/auth/register.controller';
-import createVerifyJWT from 'services/auth/verifyJWT.middleware';
 import { protectedd } from 'controllers/auth/protectedTemp.controller';
-import refreshAccessToken from 'services/auth/refreshAccessToken.middleware';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
+import { createProtectedRouteMiddleware } from 'controllers/auth/auth.helpers';
+import { AUTH_ROUTES } from 'constants/routes.constant';
 const router = (tokenBlacklist: TokenBlacklist) => {
 	const router = Router();
 
-	router.post('/register', register);
-	router.post('/login', login);
+	router.post(AUTH_ROUTES.REGISTER, register);
+	router.post(AUTH_ROUTES.LOGIN, login);
 	router.post(
-		'/test',
-		createVerifyJWT(tokenBlacklist),
-		refreshAccessToken,
+		AUTH_ROUTES.TEST,
+		...createProtectedRouteMiddleware(tokenBlacklist),
 		protectedd,
 	);
 	return router;

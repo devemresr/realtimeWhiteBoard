@@ -1,7 +1,5 @@
-import { NextFunction } from 'express';
 import TokenBucket from '../services/rate-limit/TokenBucket';
 import { Socket } from 'socket.io';
-import { error } from 'console';
 
 class RateLimitError extends Error {
 	retryAfter: number;

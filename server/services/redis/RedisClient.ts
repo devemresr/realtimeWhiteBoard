@@ -1,18 +1,18 @@
 import Redis, { RedisOptions } from 'ioredis';
 import logger from '@shared/util/logger';
 import { EventEmitter } from 'events';
+import { redisCmdDuration } from '../../metrics';
 
 export class RedisClient extends EventEmitter {
 	private client: Redis;
 	private config: RedisOptions;
 	private isConnected = false;
 	private clientName: string;
-	private connectionPromise: Promise<void> | null = null;
 
 	private log;
 
 	private setupEventHandlers(): void {
-		// persistent listener — stays attached through retries
+		// persistent listener stays attached through retries
 		this.client?.on('error', (err) => {
 			this.isConnected = false;
 			console.error(`[${this.clientName}] error:`, err);
@@ -36,7 +36,10 @@ export class RedisClient extends EventEmitter {
 		});
 	}
 
-	private constructor(config?: RedisOptions, clientName?: string) {
+	private constructor(
+		config?: Omit<RedisOptions, 'lazyConnect'>,
+		clientName?: string,
+	) {
 		super();
 		this.clientName = clientName ?? `redis-${Date.now()}`;
 		this.log = logger.child({ redisClient: this.clientName });
@@ -44,16 +47,13 @@ export class RedisClient extends EventEmitter {
 		this.config = {
 			host: process.env.REDIS_HOST || 'localhost',
 			port: parseInt(process.env.REDIS_PORT || '6379'),
-			// maxRetriesPerRequest: process.env.NODE_ENV === 'production' ? 3 : null,
 			maxRetriesPerRequest: 3,
 			connectTimeout: 10000,
 			keepAlive: 30000,
 			enableReadyCheck: true,
 			retryStrategy: (times) => {
 				if (times > 10) {
-					this.log.error(
-						'Connection failed after 10 retry attempts — giving up',
-					);
+					this.log.error('Connection failed after 10 retry attempts giving up');
 					return null;
 				}
 				const delay = Math.min(times * 50, 500);
@@ -64,18 +64,16 @@ export class RedisClient extends EventEmitter {
 				return delay;
 			},
 			...config,
-			// ...{ lazyConnect: true },
 		};
 
 		this.client = new Redis(this.config);
+		this.client.on('command', (command) => {
+			const end = redisCmdDuration.startTimer({ command: command.name });
+			command.promise.finally(() => end());
+		});
 		this.setupEventHandlers();
 	}
 
-	// static async create(config?: RedisOptions, clientName?: string) {
-	// 	const instance = new RedisClient(config, clientName);
-	// 	// await instance.connect();
-	// 	return instance;
-	// }
 	static async create(config?: RedisOptions, clientName?: string) {
 		const instance = new RedisClient(config, clientName);
 
@@ -98,39 +96,77 @@ export class RedisClient extends EventEmitter {
 		});
 	}
 
-	// async connect(): Promise<void> {
-	// 	if (this.isConnected) return;
-	// 	if (this.connectionPromise) return this.connectionPromise;
-
-	// 	this.connectionPromise = new Promise<void>((resolve, reject) => {
-	// 		// this once() is only for the initial connect attempt result
-	// 		this.client.once('ready', () => {
-	// 			this.connectionPromise = null;
-	// 			this.isConnected = true;
-	// 			resolve();
-	// 		});
-
-	// 		this.client.once('error', (err) => {
-	// 			this.connectionPromise = null;
-	// 			reject(err);
-	// 		});
-
-	// 		this.client.connect().catch((err) => {
-	// 			this.connectionPromise = null;
-	// 			reject(err);
-	// 		});
-	// 	});
-
-	// 	return this.connectionPromise;
-	// }
-
 	getRawClient(): Redis {
 		if (!this.isReady()) {
 			throw new Error(
-				`[${this.clientName}] Client not ready — call connect() first`,
+				`[${this.clientName}] Client not ready call connect() first`,
 			);
 		}
-		return this.client;
+		return process.env.NODE_ENV === 'test' // only test env doesn't need prometheus
+			? this.client
+			: new Proxy(this.client, {
+					get: (target, prop) => {
+						const original = target[prop as keyof Redis];
+						if (typeof original !== 'function') return original;
+
+						const skipCommands = new Set([
+							'on',
+							'once',
+							'off',
+							'emit',
+							'duplicate',
+							'connect',
+							'disconnect',
+						]);
+
+						// Return uninstrumented function immediately for non-Redis methods
+						if (skipCommands.has(String(prop))) {
+							return (original as Function).bind(target);
+						}
+
+						if (String(prop) === 'pipeline') {
+							return (...args: any[]) => {
+								const pipeline = (original as Function).apply(target, args);
+								const originalExec = pipeline.exec.bind(pipeline);
+								pipeline.exec = (...execArgs: any[]) => {
+									const end = redisCmdDuration.startTimer({
+										command: 'pipeline',
+										client: this.clientName,
+									});
+									let ended = false;
+									const safeEnd = () => {
+										if (!ended) {
+											ended = true;
+											end();
+										}
+									};
+									return originalExec(...execArgs).finally(safeEnd);
+								};
+								return pipeline;
+							};
+						}
+
+						return (...args: any[]) => {
+							const end = redisCmdDuration.startTimer({
+								command: String(prop),
+								client: this.clientName,
+							});
+							let ended = false;
+							const safeEnd = () => {
+								if (!ended) {
+									ended = true;
+									end();
+								}
+							};
+							const result = (original as Function).apply(target, args);
+							if (result instanceof Promise) {
+								return result.finally(safeEnd);
+							}
+							safeEnd();
+							return result;
+						};
+					},
+				});
 	}
 
 	isReady(): boolean {
