@@ -15,8 +15,8 @@ export function safeJsonParse(value: string): unknown {
 }
 
 export enum RedisParseMode {
-	HASH, // array is [key, val, key, val] — hgetall style
-	SET, // array is [val, val, val] — smembers style
+	HASH, // array is [key, val, key, val] - hgetall style
+	SET, // array is [val, val, val] - smembers style
 }
 
 /**
@@ -24,7 +24,7 @@ export enum RedisParseMode {
  *
  * @returns ParsedRedisFields - always returns an object, never an array.
  * If your use case expects an array (e.g. LRANGE results), do not use this
- * function — handle parsing in the caller instead.
+ * function - handle parsing in the caller instead.
  *
  * Empty input (empty array, empty object, empty string) returns {}.
  * String input type returns {}

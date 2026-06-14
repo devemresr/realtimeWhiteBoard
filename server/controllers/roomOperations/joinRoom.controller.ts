@@ -47,9 +47,9 @@ export const joinRoom = async (req: Request, res: Response) => {
 		}
 
 		const [
-			[bannedErr, isBanned], // sismember → number (0 or 1)
-			[roomMetaErr, rawRoomMeta], // hgetall → Record<string, string> | null
-			[roomRoleErr, roomRole], // hget → string | null
+			[bannedErr, isBanned], // sismember => number (0 or 1)
+			[roomMetaErr, rawRoomMeta], // hgetall => Record<string, string> | null
+			[roomRoleErr, roomRole], // hget => string | null
 		] = readResults as [
 			[Error | null, number],
 			[Error | null, Record<string, string> | null],

@@ -57,7 +57,7 @@ async function seed() {
 	// Write CSV
 	const csv = 'roomId\n' + roomIds.join('\n');
 	fs.writeFileSync('client/tests/artillery/rooms.csv', csv);
-	console.log(`Seeded ${NUM_ROOMS} rooms → rooms.csv`);
+	console.log(`Seeded ${NUM_ROOMS} rooms => rooms.csv`);
 }
 
 seed().catch(console.error);

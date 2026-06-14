@@ -26,7 +26,7 @@ services:
     env_file:
       - .env.production
     environment:
-      # overrides env_file — container networking uses service names not localhost
+      # overrides env_file - container networking uses service names not localhost
       - REDIS_HOST=redis_main
       - REDIS_ADAPTER_HOST=redis_adapter
       - REDIS_ADAPTER_PORT=6379

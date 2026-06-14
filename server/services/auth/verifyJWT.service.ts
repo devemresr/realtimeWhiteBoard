@@ -12,11 +12,11 @@ const extractBearerToken = (authHeader: string | undefined): string | null => {
  * Factory that returns a JWT verification middleware bound to a TokenBlacklist instance.
  *
  * Flow:
- * - No refresh token cookie → 401 immediately, nothing to fall back to
- * - No / invalid Bearer token → flag for refresh, let refreshAccessToken handle it
- * - Valid token but blacklisted → flag for refresh
- * - Expired token → flag for refresh
- * - Valid, non-blacklisted token → attach to req and continue
+ * - No refresh token cookie => 401 immediately, nothing to fall back to
+ * - No / invalid Bearer token => flag for refresh, let refreshAccessToken handle it
+ * - Valid token but blacklisted => flag for refresh
+ * - Expired token => flag for refresh
+ * - Valid, non-blacklisted token => attach to req and continue
  */
 const createVerifyJWT = (tokenBlacklist: TokenBlacklist) => {
 	return async (req: Request, res: Response, next: NextFunction) => {

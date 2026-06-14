@@ -11,12 +11,10 @@ import { ToolInstance } from 'src/types/tool.types';
 import { useEraserManager } from './useEraserManager';
 import logger from '../../../util/logger';
 import { useRoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
-import { useCanvasState } from '../state/useCanvasState';
 import usePacketTransmitter from '../../networking/packets/usePacketTransmitter';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 interface UseEraserToolProps {
-	canvasRef;
-	canvasState: ReturnType<typeof useCanvasState>;
 	eraserSize: number;
 	eraserManager: ReturnType<typeof useEraserManager>;
 	roomPacketBuilder: ReturnType<typeof useRoomPacketBuilder>;
@@ -25,30 +23,12 @@ interface UseEraserToolProps {
 }
 
 export const useEraserTool = ({
-	canvasRef,
-	canvasState,
 	eraserSize,
 	eraserManager,
 	roomPacketBuilder,
 	getEnrichedInterpolatedPoints,
 	packetTransmitter,
 }: UseEraserToolProps): ToolInstance => {
-	const setupContext = useCallback(() => {
-		if (!canvasRef.current || ctxRef.current) return;
-		const ctx = canvasRef.current.getContext('2d');
-		if (!ctx) return;
-		ctx.imageSmoothingEnabled = true;
-		ctx.imageSmoothingQuality = 'high';
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
-		ctxRef.current = ctx;
-	}, []);
-
-	useEffect(() => {
-		setupContext();
-	}, [canvasRef.current, setupContext]);
-
-	const ctxRef = useRef(null);
 	const [isErasing, setIsErasing] = useState(false);
 	const eraserPathCache = useRef<EraserPoint[]>([]);
 	const { handlePacketSending } = packetTransmitter;
@@ -95,7 +75,7 @@ export const useEraserTool = ({
 
 	const continueInteraction = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
-			if (!isErasing || !ctxRef.current) return;
+			if (!isErasing) return;
 
 			const nativeEvent = e.nativeEvent as any;
 			const events = nativeEvent.getCoalescedEvents?.() || [e.nativeEvent];

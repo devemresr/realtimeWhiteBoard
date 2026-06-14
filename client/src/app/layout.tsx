@@ -8,6 +8,7 @@ import { createElement, useState } from 'react';
 import { cursors } from '../components/config';
 import Modal from 'src/components/modal';
 import Menu from 'src/components/menu';
+// import { CanvasStateProvider } from 'src/contexts/CanvasStateContext';
 export default function RootLayout({ children }: { children: ReactNode }) {
 	const [queryClient] = useState(
 		() =>
@@ -40,6 +41,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }`}
 				</style>
 				<QueryClientProvider client={queryClient}>
+					{/* <CanvasStateProvider>
+						</CanvasStateProvider> */}
 					<Modal />
 					<Menu />
 					{children}

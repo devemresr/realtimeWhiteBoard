@@ -3,14 +3,13 @@ import { CanvasOperation, MessageStatus } from '@/types';
 import logger from '../../../util/logger';
 import { useReceivedPacketManager } from '../packets/useReceivedPacketManager';
 import { useGapHandler } from './useGapHandler';
-import { useCanvasState } from '../../canvas/state/useCanvasState';
 import { DrawIncrementalPathFn } from '../../canvas/drawing/useCanvasDrawing';
 import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 export type DrawBroadcastPathFn = (packet: CanvasOperation) => void;
 
 export const useBroadcastRenderer = (
-	canvasState: ReturnType<typeof useCanvasState>,
 	drawIncrementalPath: DrawIncrementalPathFn,
 ) => {
 	const receivedPacketManager = useReceivedPacketManager();

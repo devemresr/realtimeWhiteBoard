@@ -1,34 +1,27 @@
 import { useCallback, useRef, useState } from 'react';
-import {
-	StoreStrokeInterpolatedPointsFn,
-	useCanvasState,
-} from '../state/useCanvasState';
 import { useRoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
 import { DrawingOperation, DrawingPoint, CanvasOperationType } from '@/types';
 import { ToolInstance } from 'src/types/tool.types';
 import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
 import { HandlePacketSendingFn } from '../../networking/packets/usePacketTransmitter';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 interface UseDrawToolProps {
 	brushColor: string;
 	brushSize: number;
 	roomPacketBuilder: ReturnType<typeof useRoomPacketBuilder>;
-	canvasState: ReturnType<typeof useCanvasState>;
 	drawDotOnCanvas: DrawDotOnCanvasFn;
 	drawIncrementalPath: DrawIncrementalPathFn;
 	handlePacketSending: HandlePacketSendingFn;
-	storeStrokeInterpolatedPoints: StoreStrokeInterpolatedPointsFn;
 }
 
 export const useDrawTool = ({
 	brushColor,
 	brushSize,
 	roomPacketBuilder,
-	canvasState,
 	drawDotOnCanvas,
 	drawIncrementalPath,
 	handlePacketSending,
-	storeStrokeInterpolatedPoints,
 }: UseDrawToolProps): ToolInstance => {
 	const [isDrawing, setIsDrawing] = useState(false);
 	const strokePointsRef = useRef<DrawingPoint[]>([]);
@@ -117,7 +110,7 @@ export const useDrawTool = ({
 				);
 
 				if (didInterpolated)
-					storeStrokeInterpolatedPoints(
+					canvasState.storeStrokeInterpolatedPoints(
 						packet.strokeId,
 						packet.canvasMessageId,
 						interpolatedPoints as DrawingPoint[],
@@ -129,7 +122,6 @@ export const useDrawTool = ({
 			brushSize,
 			brushColor,
 			roomPacketBuilder,
-			canvasState,
 			handlePacketSending,
 			drawIncrementalPath,
 		],
@@ -153,7 +145,7 @@ export const useDrawTool = ({
 		);
 
 		if (didInterpolated)
-			storeStrokeInterpolatedPoints(
+			canvasState.storeStrokeInterpolatedPoints(
 				packet.strokeId,
 				packet.canvasMessageId,
 				interpolatedPoints as DrawingPoint[],
@@ -161,7 +153,7 @@ export const useDrawTool = ({
 
 		setIsDrawing(false);
 		strokePointsRef.current = [];
-	}, [isDrawing, roomPacketBuilder, canvasState, handlePacketSending]);
+	}, [isDrawing, roomPacketBuilder, handlePacketSending]);
 
 	return {
 		startInteraction,

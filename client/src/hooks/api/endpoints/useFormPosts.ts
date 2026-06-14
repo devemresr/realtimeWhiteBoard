@@ -1,6 +1,6 @@
 'use client';
 
-import useApiQuery from '../core/useApiQuerry';
+import useApiQuery from '../core/useApiQuery';
 import useApiMutation from '../core/useApiMutation';
 import { AUTH_ROUTES } from 'src/constants/routes.constant';
 import { ROOM_ROUTES } from 'src/constants/routes.constant';
