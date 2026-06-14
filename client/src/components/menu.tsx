@@ -10,10 +10,12 @@ import {
 } from '../constants/svgs';
 import { useModalStore } from 'src/store/ModalStore';
 import AuthModal from 'src/modals/authModal';
+import { useUserStore } from 'src/store/UserStore';
+import CollabModal from 'src/modals/collabModal';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
-	const [loggedIn, setLoggedIn] = useState(false);
 	const modalStore = useModalStore();
+	const { loggedIn } = useUserStore();
 	const color = '#2f2f2f';
 	const menuElementsConfig = [
 		{
@@ -46,8 +48,7 @@ export default function Menu() {
 				loggedIn
 					? modalStore.openModal({
 							title: 'Collaborate',
-							text: 'test',
-							extra: <></>,
+							extra: <CollabModal />,
 						})
 					: modalStore.openModal({ extra: <AuthModal /> }),
 		},
@@ -83,7 +84,7 @@ export default function Menu() {
 			</button>
 			{menuOpen && (
 				<div
-					style={{ width: 220, zIndex: 100 }}
+					style={{ width: 240, zIndex: 100 }}
 					className='container fixed left-2 top-12 bg-white border rounded-lg border-gray-200 p-2 shadow flex flex-col gap-1'
 				>
 					{menuElementsConfig.map((e) => {

@@ -24,10 +24,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 			<body>
 				<style>
 					{` /* Apply custom cursor globally and for all states */
-					button *, a *, .hover * {
+					button *, a *, .hover *, input *, .focus * , label * {
 					  cursor: inherit !important;
 					}
-          html, body, *, button, a, input,
+          html, body, *, label, button, a, input,
           .disabled, a:disabled, input:disabled {
             cursor: ${cursors['cursor-default']}, auto;
           }

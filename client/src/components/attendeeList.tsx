@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FaCrown } from 'react-icons/fa';
 import { FaTrashAlt } from 'react-icons/fa';
 import { PiUsersThree } from 'react-icons/pi';
 export default function AttendeeList() {
 	const [active, setActive] = useState(false);
 	const [online, setOnline] = useState(false); // only render if its collaborated on
+	useEffect(() => {
+		setOnline(true); // todo set online status based on real connection status
+	}, []);
 	const user = {
 		id: 'u001',
 		username: 'teacher_jane',

@@ -6,10 +6,20 @@ export default function CustomInput({
 	onChange,
 	value,
 	validationMessage,
+	className,
+}: {
+	title?: string;
+	isInvalid?: boolean;
+	area: string;
+	placeholder: string;
+	onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+	value: string;
+	validationMessage?: string;
+	className?: string;
 }) {
 	return (
-		<div>
-			<p className='text-gray-700 font-medium'>{title}</p>
+		<div className={className}>
+			{title && <p className='text-gray-700 font-medium'>{title}</p>}
 			<div
 				className={`w-full border rounded-lg p-1.5 flex flex-row items-center ${isInvalid ? 'border-red-500' : 'border-gray-300'} border-gray-300 focus-within:border-purple-500 transition-colors shadow-sm`}
 			>
@@ -26,7 +36,7 @@ export default function CustomInput({
 			<p
 				className={`text-red-500 text-sm max-w-[390px] transition-all duration-300 ease-in-out ${isInvalid ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}
 			>
-				{validationMessage}
+				{isInvalid && validationMessage && validationMessage}
 			</p>
 		</div>
 	);

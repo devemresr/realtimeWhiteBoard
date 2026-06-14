@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { canvasBarItems } from './config';
 import { ToastContainer, toast } from 'react-toastify';
+import { useModalStore } from 'src/store/ModalStore';
 export default function CanvasBar({
 	setSelectedElement,
 	selectedElement,
@@ -8,11 +9,13 @@ export default function CanvasBar({
 	isLogging,
 	setIsLogging,
 }) {
+	const { visible } = useModalStore();
 	const items = canvasBarItems;
 	const notify = () => toast('Wow so easy !');
 	const handlers = { clear: clearCanvas };
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => {
+		if (visible) return; // prevent keydown events when modal is open
 		const handleKeyDown = (e: KeyboardEvent) => {
 			const key = e.key;
 			if (key >= '1' && key <= '9') {

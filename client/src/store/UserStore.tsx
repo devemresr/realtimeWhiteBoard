@@ -9,8 +9,9 @@ const initialState: UserState = {
 	avatar: '',
 };
 
-export const useUserStore = create<UserState & UserActions>((set) => ({
+export const useUserStore = create<UserState & UserActions>((set, get) => ({
 	...initialState,
 	setUser: (user) => set(() => ({ ...user })),
 	resetUser: () => set(() => initialState),
+	loggedIn: () => !!get().id,
 }));

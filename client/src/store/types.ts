@@ -23,4 +23,5 @@ export type UserState = {
 export type UserActions = {
 	setUser: (user: UserState) => void;
 	resetUser: () => void;
+	loggedIn: () => boolean;
 };

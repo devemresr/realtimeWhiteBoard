@@ -1,0 +1,289 @@
+import { useEffect, useState } from 'react';
+import CustomInput from './customInput';
+import CustomPagination from './customPagination';
+import { FaRegUser } from 'react-icons/fa';
+
+export default function JoinRoom({
+	roomForm,
+	handleRoomForm,
+}: {
+	roomForm: any;
+	handleRoomForm: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
+	const [foundRoom, setFoundRoom] = useState(null);
+	const [showPassword, setShowPassword] = useState(false);
+	useEffect(() => {
+		// todo check if the room is real
+		const timer = setTimeout(() => {
+			if (!roomForm.code) {
+				setFoundRoom(null);
+				setShowPassword(false);
+				return;
+			}
+
+			const room = dummyRooms.find(
+				(r) => r.code.toLowerCase() === roomForm.code.toLowerCase(),
+			);
+
+			setFoundRoom(room || null);
+
+			if (room && room.password && room.password.length > 0) {
+				setShowPassword(true);
+			} else {
+				setShowPassword(false);
+			}
+		}, 700);
+
+		return () => clearTimeout(timer);
+	}, [roomForm.code]);
+	const dummyRooms = [
+		{
+			id: 'room001',
+			name: 'Frontend Study Group',
+			code: 'FRONT123',
+			private: false,
+			password: '',
+			owner: {
+				id: 'u001',
+				username: 'teacher_jane',
+				displayName: 'Jane Wilson',
+				email: 'jane.wilson@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=1',
+				role: 'owner',
+				isOnline: true,
+				joinedAt: '2026-06-09T09:00:00Z',
+			},
+			memberCount: 12,
+		},
+		{
+			id: 'room002',
+			name: 'Algorithms Workshop',
+			code: 'ALG456',
+			private: true,
+			password: 'algo2026',
+			owner: {
+				id: 'u002',
+				username: 'cs_prof',
+				displayName: 'Michael Chen',
+				email: 'michael.chen@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=2',
+				role: 'owner',
+				isOnline: false,
+				joinedAt: '2026-06-08T14:30:00Z',
+			},
+			memberCount: 8,
+		},
+		{
+			id: 'room003',
+			name: 'UI Design Review',
+			code: 'DESIGN88',
+			private: true,
+			password: '',
+			owner: {
+				id: 'u003',
+				username: 'ux_sarah',
+				displayName: 'Sarah Miller',
+				email: 'sarah.miller@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=3',
+				role: 'owner',
+				isOnline: true,
+				joinedAt: '2026-06-10T11:15:00Z',
+			},
+			memberCount: 15,
+		},
+		{
+			id: 'room004',
+			name: 'Project Team Alpha',
+			code: 'ALPHA42',
+			private: false,
+			password: 'teamalpha',
+			owner: {
+				id: 'u004',
+				username: 'lead_dev',
+				displayName: 'David Rodriguez',
+				email: 'david.rodriguez@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=4',
+				role: 'owner',
+				isOnline: true,
+				joinedAt: '2026-06-07T16:45:00Z',
+			},
+			memberCount: 5,
+		},
+		{
+			id: 'room005',
+			name: 'Photography Challenge',
+			code: 'PHOTO99',
+			private: false,
+			password: '',
+			owner: {
+				id: 'u005',
+				username: 'lensmaster',
+				displayName: 'Emma Carter',
+				email: 'emma.carter@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=5',
+				role: 'owner',
+				isOnline: false,
+				joinedAt: '2026-06-06T08:20:00Z',
+			},
+			memberCount: 24,
+		},
+		{
+			id: 'room006',
+			name: 'Exam Preparation',
+			code: 'EXAM2026',
+			private: true,
+			password: 'studyhard',
+			owner: {
+				id: 'u006',
+				username: 'mentor_ali',
+				displayName: 'Ali Demir',
+				email: 'ali.demir@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=6',
+				role: 'owner',
+				isOnline: true,
+				joinedAt: '2026-06-05T18:00:00Z',
+			},
+			memberCount: 18,
+		},
+		{
+			id: 'room007',
+			name: 'React Native Help',
+			code: 'RNHELP',
+			private: false,
+			password: '',
+			owner: {
+				id: 'u007',
+				username: 'mobile_guru',
+				displayName: 'Lucas Brown',
+				email: 'lucas.brown@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=7',
+				role: 'owner',
+				isOnline: true,
+				joinedAt: '2026-06-10T13:40:00Z',
+			},
+			memberCount: 31,
+		},
+		{
+			id: 'room008',
+			name: 'Secret Project',
+			code: 'SECRETX',
+			private: false,
+			password: 'classified',
+			owner: {
+				id: 'u008',
+				username: 'project_lead',
+				displayName: 'Olivia Johnson',
+				email: 'olivia.johnson@example.com',
+				avatar: 'https://i.pravatar.cc/150?img=8',
+				role: 'owner',
+				isOnline: false,
+				joinedAt: '2026-06-04T21:10:00Z',
+			},
+			memberCount: 3,
+		},
+	];
+	const publicRooms = dummyRooms.filter((room) => !room.private);
+	const [paginationPageNumber, setPaginationPageNumber] = useState(1);
+	const [selectedRoomCode, setSelectedRoomCode] = useState(null);
+	const itemsPerPage = 3;
+	const lastIndex = paginationPageNumber * itemsPerPage;
+	const firstIndex = lastIndex - itemsPerPage;
+	const paginatedRooms = publicRooms.slice(firstIndex, lastIndex);
+	const pageAmount = Math.ceil(publicRooms.length / itemsPerPage);
+	const handleJoinRoom = () => {};
+	return (
+		<div>
+			<div className='flex flex-col gap-2'>
+				<div className='flex flex-row gap-2 pt-2'>
+					<CustomInput
+						area='code'
+						placeholder='Room Code'
+						onChange={(e) => handleRoomForm(e)}
+						value={roomForm.code}
+						className={`w-full`}
+					/>
+					<button
+						disabled={!foundRoom}
+						onClick={handleJoinRoom}
+						className='bg-purple-500 self-end text-white px-4 py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out  disabled:bg-gray-300 disabled:text-gray-500'
+					>
+						Join
+					</button>
+				</div>
+				{showPassword && ( //only show password area if password is required
+					<CustomInput
+						area='password'
+						placeholder='Password'
+						onChange={handleRoomForm}
+						value={roomForm.password}
+						className='w-full'
+					/>
+				)}
+			</div>
+			<div className='w-full h-0.5 bg-gray-200 my-2' />
+			<div className='flex flex-col gap-4 pt-2 overflow-hidden'>
+				{paginatedRooms.map((room) => {
+					const isSelected = selectedRoomCode === room.code;
+					return (
+						<button
+							key={room.id}
+							className='border border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow duration-300 ease-in-out'
+							onClick={() => setSelectedRoomCode(room.code)}
+						>
+							<span className='flex justify-between items-center'>
+								<h3 className=''>{room.name}</h3>
+								<div className='flex items-baseline gap-1'>
+									<FaRegUser
+										style={{ position: 'relative', top: 1 }}
+										className='text-gray-600'
+										size={14}
+									/>
+									<p className='text-gray-600'>{room.memberCount}</p>
+								</div>
+							</span>
+							{isSelected && ( // only the selected room shows
+								<p className='text-gray-500 text-left text-sm'>{room.code}</p>
+							)}
+							{!!room.password && (
+								<div
+									className={`flex gap-2 items-center-safe transition-all duration-400 ease-in-out ${isSelected ? 'max-h-40 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}
+								>
+									<CustomInput
+										area='password'
+										placeholder='Password'
+										onChange={(e) => handleRoomForm(e)}
+										value={roomForm.password}
+										className='w-full'
+									/>
+									<button
+										onClick={handleJoinRoom}
+										className='bg-purple-500 self-end text-white px-4 py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out'
+									>
+										Join
+									</button>
+								</div>
+							)}
+							{!room.password && (
+								<div //needs wrapper for animation to work properly
+									className={`transition-all duration-400 ease-in-out ${isSelected ? 'max-h-40 opacity-100 mt-2 py-2' : 'max-h-0 opacity-0'}`}
+								>
+									<button
+										onClick={handleJoinRoom}
+										className={`w-full bg-purple-500 self-end text-white rounded-lg hover:bg-purple-600 transition-color duration-300 ease-in-out ${isSelected ? 'py-1.5' : ''}`}
+									>
+										Join
+									</button>
+								</div>
+							)}
+						</button>
+					);
+				})}
+				<CustomPagination
+					paginationPageNumber={paginationPageNumber}
+					setPaginationPageNumber={setPaginationPageNumber}
+					pageAmount={pageAmount}
+				/>
+			</div>
+		</div>
+	);
+}

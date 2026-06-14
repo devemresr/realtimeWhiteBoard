@@ -47,3 +47,92 @@ export const authFormData: AuthFormData = {
 			'Password must be at least 8 characters long and contain an uppercase letter, a number, and a special character.',
 	},
 };
+
+export const collabButtons = [
+	{
+		key: 'create',
+		label: 'Create room',
+		bgHover: 'hover:bg-yellow-500',
+		bg: 'bg-yellow-500',
+		shapes: [
+			{
+				cls: 'top-2 -left-2 w-24 h-24 bg-gray-400',
+				bg: '!bg-pink-400',
+				colorHover: 'group-hover:bg-pink-400',
+				shapeHover: 'group-hover:animate-float1',
+				animation: 'animate-float1',
+			},
+			{
+				cls: 'top-24 left-0 w-28 h-28 bg-gray-500',
+				bg: 'bg-red-500',
+				colorHover: 'group-hover:bg-red-500',
+				shapeHover: 'group-hover:animate-float2',
+				animation: 'animate-float2',
+			},
+			{
+				cls: '-top-4 left-12 w-24 h-24 bg-gray-500',
+				bg: '!bg-orange-500',
+				colorHover: 'group-hover:bg-orange-500',
+				shapeHover: 'group-hover:animate-float2',
+				animation: 'animate-float2',
+			},
+			{
+				cls: 'top-16 left-24 w-20 h-20 bg-gray-400',
+				bg: '!bg-pink-500',
+				colorHover: 'group-hover:bg-pink-500',
+				shapeHover: 'group-hover:animate-float3',
+				animation: 'animate-float3',
+			},
+			{
+				cls: 'top-32 left-32 w-20 h-20 bg-gray-500',
+				bg: '!bg-orange-500',
+				colorHover: 'group-hover:bg-orange-500',
+				shapeHover: 'group-hover:animate-float1',
+				animation: 'animate-float1',
+			},
+		],
+	},
+	{
+		key: 'join',
+		label: 'Join room',
+		bgHover: 'hover:bg-cyan-500',
+		bg: 'bg-cyan-500',
+		shapes: [
+			{
+				cls: '-top-8 -left-2 w-28 h-28 bg-gray-500',
+				bg: '!bg-blue-600',
+				colorHover: 'group-hover:bg-blue-600',
+				shapeHover: 'group-hover:animate-float2',
+				animation: 'animate-float2',
+			},
+			{
+				cls: 'top-24 left-0 w-24 h-24 bg-gray-500',
+				bg: '!bg-purple-500',
+				colorHover: 'group-hover:bg-purple-500',
+				shapeHover: 'group-hover:animate-float1',
+				animation: 'animate-float1',
+			},
+			{
+				cls: '-top-8 right-2 w-24 h-24 bg-gray-400',
+				bg: '!bg-pink-400',
+				colorHover: 'group-hover:bg-pink-400',
+				shapeHover: 'group-hover:animate-float1',
+				animation: 'animate-float1',
+			},
+			{
+				cls: 'top-12 -right-4 w-20 h-20 bg-gray-500',
+				bg: '!bg-blue-600',
+				colorHover: 'group-hover:bg-blue-600',
+				shapeHover: 'group-hover:animate-float3',
+				animation: 'animate-float3',
+			},
+			{
+				cls: 'top-24 -right-2 w-24 h-24 bg-gray-400',
+				bg: '!bg-pink-400',
+				colorHover: 'group-hover:bg-pink-400',
+				shapeHover: 'group-hover:animate-float2',
+				animation: 'animate-float2',
+			},
+		],
+	},
+];

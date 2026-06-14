@@ -4,10 +4,12 @@ import { authContent, authFormData } from './config';
 import CustomInput from 'src/components/customInput';
 import UploadAvatar from 'src/components/uploadAvatar';
 import { useUserStore } from 'src/store/UserStore';
+import { useModalStore } from 'src/store/ModalStore';
 
 export default function AuthModal() {
 	const userStore = useUserStore();
 	const [authType, setAuthType] = useState<AuthContentTypes>('signIn');
+	const { closeModal } = useModalStore();
 	const [authForm, setAuthForm] = useState({
 		avatar:
 			'https://cdn.vectorstock.com/i/500p/71/90/blank-avatar-placeholder-icon-vector-30257190.jpg',
@@ -34,6 +36,7 @@ export default function AuthModal() {
 			email: authForm.email,
 			avatar: '',
 		});
+		closeModal();
 	};
 	const handleSignUp = () => {
 		if (isPasswordCorrect) {
@@ -44,6 +47,7 @@ export default function AuthModal() {
 				email: authForm.email,
 				avatar: authForm.avatar,
 			});
+			closeModal();
 		} // todo backend integration for sign up
 	};
 	const handleAuthForm = (e) => {
@@ -91,7 +95,7 @@ export default function AuthModal() {
 						area={area}
 						placeholder={authFormData[area].placeholder}
 						onChange={(e) => handleAuthForm(e)}
-						value={authForm[area]}
+						value={value}
 						validationMessage={authFormData[area].validationMessage}
 					/>
 				);
