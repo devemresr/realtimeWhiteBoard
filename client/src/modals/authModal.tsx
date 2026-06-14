@@ -73,7 +73,6 @@ export default function AuthModal() {
 			</div>
 			{authType === 'signUp' && (
 				<UploadAvatar
-					avatar={authForm.avatar}
 					setAvatar={(url) =>
 						setAuthForm((prev) => ({
 							...prev,
@@ -90,6 +89,7 @@ export default function AuthModal() {
 				const isInvalid = !isEmpty && !isValid;
 				return (
 					<CustomInput
+						key={area + 100}
 						title={authFormData[area].title}
 						isInvalid={isInvalid}
 						area={area}

@@ -14,7 +14,6 @@ import { ToolHandlersMap, ToolType } from 'src/types/tool.types';
 import CanvasSideBar from './canvasSideBar/canvasSideBar';
 import { CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
-import Menu from './menu';
 import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
 import useMouseLog from '../hooks/debug/useMouseLog';
 import { useBroadcastRenderer } from '../hooks/networking/synchronization/useBroadcastPath';
@@ -168,7 +167,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
           }
         `}
 			</style>
-			<Menu />
+
 			<CanvasBar
 				setSelectedElement={setSelectedElement}
 				selectedElement={selectedElement}

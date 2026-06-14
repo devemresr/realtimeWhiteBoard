@@ -8,37 +8,74 @@ import {
 	UsersSVG,
 	UserSVG,
 } from '../constants/svgs';
+import { TbLogout } from 'react-icons/tb';
 import { useModalStore } from 'src/store/ModalStore';
 import AuthModal from 'src/modals/authModal';
 import { useUserStore } from 'src/store/UserStore';
 import CollabModal from 'src/modals/collabModal';
+import { usePathname, useRouter } from 'next/navigation';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const modalStore = useModalStore();
-	const { loggedIn } = useUserStore();
+	const { resetUser, id } = useUserStore();
+	const router = useRouter();
+	const pathname = usePathname();
+	const loggedIn = !!id;
 	const color = '#2f2f2f';
+	const authenticatedMenuConfig = loggedIn
+		? [
+				{
+					key: 'logout',
+					icon: <TbLogout color={color} size={28} />,
+					title: 'Log Out',
+					subtitle: '',
+					trigger: () => {
+						console.log('id:', id);
+						resetUser();
+					},
+				},
+				{
+					key: 'account',
+					icon: <UserSVG color={color} props={{ width: 28 }} />,
+					title: 'Manage Account',
+					subtitle: '',
+					trigger: () => router.push('/manage-account'),
+				},
+			]
+		: [
+				{
+					key: 'authenticate',
+					icon: <UserSVG color={color} props={{ width: 28 }} />,
+					title: 'Sign In',
+					subtitle: '',
+					trigger: () => {
+						console.log('id:', id);
+						modalStore.openModal({ extra: <AuthModal /> });
+					},
+				},
+			];
+	const canvasMenuConfig =
+		pathname === '/'
+			? [
+					{
+						key: 'save',
+						icon: <DownloadSVG color={color} props={{ width: 28 }} />,
+						title: 'Save to...',
+						subtitle: '',
+						trigger: () => {},
+					},
+				]
+			: [];
 	const menuElementsConfig = [
 		{
-			key: 'save',
-			icon: <DownloadSVG color={color} props={{ width: 28 }} />,
-			title: 'Save to...',
-			subtitle: '',
-			trigger: () => {},
-		},
-		{
-			key: 'open',
+			key: 'new',
 			icon: <FolderSVG color={color} props={{ width: 24 }} />,
-			title: 'Open',
+			title: 'Open new',
 			subtitle: 'Ctrl+O',
-			trigger: () => {},
+			trigger: () => router.push('/'),
 		},
-		{
-			key: 'authenticate',
-			icon: <UserSVG color={color} props={{ width: 28 }} />,
-			title: 'Sign In',
-			subtitle: '',
-			trigger: () => modalStore.openModal({ extra: <AuthModal /> }),
-		},
+		...canvasMenuConfig,
+		...authenticatedMenuConfig,
 		{
 			key: 'live',
 			icon: <UsersSVG color={color} props={{ width: 28 }} />,
@@ -78,7 +115,7 @@ export default function Menu() {
 			)}
 			<button
 				onClick={() => setMenuOpen(!menuOpen)}
-				className={`w-8 h-8 bg-gray-100  shadow p-1.5 items-center justify-center rounded transition-colors hover:bg-purple-100 fixed left-2 top-2`}
+				className={`w-8 h-8 z-10 bg-gray-100  shadow p-1.5 items-center justify-center rounded transition-colors hover:bg-purple-100 fixed left-2 top-2`}
 			>
 				<MenuSVG color={'#2f2f2f'} />
 			</button>

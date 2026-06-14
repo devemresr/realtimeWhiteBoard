@@ -21,7 +21,6 @@ export type UserState = {
 	avatar: string;
 };
 export type UserActions = {
-	setUser: (user: UserState) => void;
+	setUser: (user: Partial<UserState>) => void;
 	resetUser: () => void;
-	loggedIn: () => boolean;
 };

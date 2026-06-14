@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FaCrown } from 'react-icons/fa';
-import { FaTrashAlt } from 'react-icons/fa';
+import { TbLogout } from 'react-icons/tb';
 import { PiUsersThree } from 'react-icons/pi';
 export default function AttendeeList() {
 	const [active, setActive] = useState(false);
@@ -143,9 +143,9 @@ export default function AttendeeList() {
 								<p className='w-full text-left'>{attendee.displayName}</p>
 								{user.id === attendeeList.owner.id && (
 									<button onClick={() => kickUser(attendee.id)}>
-										<FaTrashAlt
-											className='transition-colors text-gray-200 hover:text-black'
-											size={16}
+										<TbLogout
+											className='transition-colors text-gray-300 hover:text-black'
+											size={18}
 										/>
 									</button>
 								)}

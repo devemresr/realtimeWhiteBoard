@@ -11,7 +11,10 @@ const initialState: UserState = {
 
 export const useUserStore = create<UserState & UserActions>((set, get) => ({
 	...initialState,
-	setUser: (user) => set(() => ({ ...user })),
+	setUser: (user) =>
+		set((state) => ({
+			...state,
+			...user,
+		})),
 	resetUser: () => set(() => initialState),
-	loggedIn: () => !!get().id,
 }));
