@@ -12,7 +12,7 @@ import {
 	CanvasEvent,
 	MessageCategory,
 } from '@/types';
-import { useGetOnboardingData } from '../../api/endpoints/useFormPosts';
+import { useGetOnboardingData } from '../../../lib/api/endpoints/useFormPosts';
 import { HandleMessageFn } from '../socket/useSocketSubscription';
 
 interface OnboardingData {
@@ -131,7 +131,7 @@ export const useOnboardingSync = (
 			logger.info('Loading onboarding data');
 
 			const { data } = await getOnboardingDataQuery.refetch();
-			// controller returns { drawingData, eventData } — map to OnboardingData shape for renderOnboardingData
+			// controller returns { drawingData, eventData } - map to OnboardingData shape for renderOnboardingData
 			const { drawingData, eventData } =
 				(data as {
 					drawingData?: NetworkCanvasOperation[];
@@ -150,7 +150,7 @@ export const useOnboardingSync = (
 				});
 			}
 
-			// if the controller returned data, trust it has the right shape —
+			// if the controller returned data, trust it has the right shape -
 			// empty arrays are valid (room with no strokes yet)
 			renderOnboardingData({
 				[MessageCategory.DRAWING]: drawingData ?? [],

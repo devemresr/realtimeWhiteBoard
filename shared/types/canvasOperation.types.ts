@@ -51,9 +51,9 @@ interface BaseCanvasOperation {
  *
  * @remarks
  * This ensures type safety at compile time:
- * - CanvasOperationType.DRAWING → must contain DrawingPoint[]
- * - CanvasOperationType.ERASER → must contain EraserPoint[]
- * - CanvasOperationType.LASSO → must contain LassoPoint[]
+ * - CanvasOperationType.DRAWING => must contain DrawingPoint[]
+ * - CanvasOperationType.ERASER => must contain EraserPoint[]
+ * - CanvasOperationType.LASSO => must contain LassoPoint[]
  *
  * TypeScript will automatically narrow the point type when you switch on canvasOperation.type,
  * eliminating the need for type guards or assertions.

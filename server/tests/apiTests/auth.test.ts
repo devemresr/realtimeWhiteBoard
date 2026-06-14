@@ -21,7 +21,7 @@ describe('POST /auth/register', () => {
 		expect(res.body.accessToken).toBeDefined();
 		expect(jwtCookie).toMatch(/^jwt=/);
 
-		// HttpOnly so JS can't read it — verify the flag is set
+		// HttpOnly so JS can't read it - verify the flag is set
 		expect(jwtCookie).toMatch(/HttpOnly/i);
 	});
 
@@ -69,8 +69,8 @@ describe('POST /auth/login', () => {
 	});
 });
 
-describe('POST /auth/test — token verification + refresh flow', () => {
-	it('valid access token — request passes through', async () => {
+describe('POST /auth/test - token verification + refresh flow', () => {
+	it('valid access token - request passes through', async () => {
 		const { accessToken, jwtCookie } = await registerAndGetTokens(getServer());
 		const res = await request(getServer())
 			.post('/auth/test')
@@ -80,7 +80,7 @@ describe('POST /auth/test — token verification + refresh flow', () => {
 		expect(res.status).toBe(200);
 	});
 
-	it('expired access + valid refresh — new access token issued, request continues', async () => {
+	it('expired access + valid refresh - new access token issued, request continues', async () => {
 		const { accessToken, jwtCookie } = await registerAndGetTokens(getServer());
 
 		// Wait for access token to expire (mocked to 500ms)
@@ -92,14 +92,14 @@ describe('POST /auth/test — token verification + refresh flow', () => {
 			.set('Cookie', jwtCookie); // refresh token still valid (mocked to 2s)
 
 		expect(res.status).toBe(200);
-		// Middleware attaches the new token — adjust this to however your
+		// Middleware attaches the new token - adjust this to however your
 
 		// protectedd handler forwards it (response header, body, etc.)
 		expect(res.body.accessToken).toBeDefined();
 		expect(res.body.accessToken !== accessToken).toBeDefined();
 	});
 
-	it('expired access + expired refresh — 401, must re-login', async () => {
+	it('expired access + expired refresh - 401, must re-login', async () => {
 		const { accessToken, jwtCookie } = await registerAndGetTokens(getServer());
 
 		// Wait for BOTH tokens to expire (refresh mocked to 2s)
@@ -114,12 +114,12 @@ describe('POST /auth/test — token verification + refresh flow', () => {
 		expect(res.body.error).toMatch(/Refresh token expired/i);
 	});
 
-	it('expired access + no refresh cookie — 401', async () => {
+	it('expired access + no refresh cookie - 401', async () => {
 		const { accessToken } = await registerAndGetTokens(getServer());
 
 		await wait(1500);
 
-		// No Cookie header at all — createVerifyJWT short-circuits immediately
+		// No Cookie header at all - createVerifyJWT short-circuits immediately
 		const res = await request(getServer())
 			.post('/auth/test')
 			.set('Authorization', `Bearer ${accessToken}`);
@@ -129,14 +129,14 @@ describe('POST /auth/test — token verification + refresh flow', () => {
 		expect(res.body.error).toMatch(/No refresh token provided/i);
 	});
 
-	it('no token at all — 401', async () => {
+	it('no token at all - 401', async () => {
 		// No Authorization header, no Cookie
 		const res = await request(getServer()).post('/auth/test');
 
 		expect(res.status).toBe(401);
 	});
 
-	it('malformed / tampered access token with valid refresh token — 200', async () => {
+	it('malformed / tampered access token with valid refresh token - 200', async () => {
 		const { jwtCookie } = await registerAndGetTokens(getServer());
 
 		const res = await request(getServer())
@@ -148,7 +148,7 @@ describe('POST /auth/test — token verification + refresh flow', () => {
 		expect(res.body.accessToken).toBeDefined();
 	});
 
-	it('malformed access token with no refresh token — 401', async () => {
+	it('malformed access token with no refresh token - 401', async () => {
 		const res = await request(getServer())
 			.post('/auth/test')
 			.set('Authorization', 'Bearer this.is.malformedToken');

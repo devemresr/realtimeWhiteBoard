@@ -1,5 +1,5 @@
 import express from 'express';
-import credentials from './config/credantials';
+import credentials from './config/credentials';
 import corsOptions from './config/corsOptions';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';

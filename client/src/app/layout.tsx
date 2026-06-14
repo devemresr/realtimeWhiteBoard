@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { createElement, useState } from 'react';
 import { cursors } from '../components/config';
 import Modal from 'src/components/modal';
+// import { CanvasStateProvider } from 'src/contexts/CanvasStateContext';
 export default function RootLayout({ children }: { children: ReactNode }) {
 	const [queryClient] = useState(
 		() =>
@@ -39,6 +40,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }`}
 				</style>
 				<QueryClientProvider client={queryClient}>
+					{/* <CanvasStateProvider>
+						</CanvasStateProvider> */}
 					<Modal />
 					{children}
 					{process.env.NODE_ENV === 'development' &&

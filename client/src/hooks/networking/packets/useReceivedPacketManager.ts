@@ -129,7 +129,7 @@ export const useReceivedPacketManager = () => {
 	);
 
 	// Removes all state for a stroke. Call this after a stroke completes
-	// or is otherwise finished with — the situation is no longer needed
+	// or is otherwise finished with - the situation is no longer needed
 	// and holding onto it would be a memory leak for long sessions.
 	const clearSituationState = useCallback((strokeId: string) => {
 		const situation = packetSituations.current.get(strokeId);

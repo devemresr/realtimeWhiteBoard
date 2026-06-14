@@ -11,12 +11,11 @@ import { ToolInstance } from 'src/types/tool.types';
 import { useEraserManager } from './useEraserManager';
 import logger from '../../../util/logger';
 import { useRoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
-import { useCanvasState } from '../state/useCanvasState';
 import usePacketTransmitter from '../../networking/packets/usePacketTransmitter';
+import { canvasState } from 'src/util/canvas/CanvasState';
 
 interface UseEraserToolProps {
 	canvasRef;
-	canvasState: ReturnType<typeof useCanvasState>;
 	eraserSize: number;
 	eraserManager: ReturnType<typeof useEraserManager>;
 	roomPacketBuilder: ReturnType<typeof useRoomPacketBuilder>;
@@ -26,7 +25,6 @@ interface UseEraserToolProps {
 
 export const useEraserTool = ({
 	canvasRef,
-	canvasState,
 	eraserSize,
 	eraserManager,
 	roomPacketBuilder,

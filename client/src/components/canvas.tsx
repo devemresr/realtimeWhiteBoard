@@ -19,7 +19,6 @@ import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
 import useMouseLog from '../hooks/debug/useMouseLog';
 import { useBroadcastRenderer } from '../hooks/networking/synchronization/useBroadcastPath';
 import { useRoomPacketBuilder } from '../hooks/networking/packets/usePacketBuilder';
-import { useCanvasState } from '../hooks/canvas/state/useCanvasState';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
 import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
@@ -47,15 +46,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	// TODO: Implement responsive canvas with coordinate transformation
 	// Replace offsetX/offsetY with getCanvasCoordinates() helper that transforms
 	// pointer events from display space to internal canvas resolution (1920x1080)
-	const canvasState = useCanvasState({
-		canvasHeight: 1000,
-		canvasWidth: 1800,
-	});
-	const {
-		getStrokeIdsNearPoint,
-		storeStrokeInterpolatedPoints,
-		getStrokeInterpolatedPoints,
-	} = canvasState;
 
 	const {
 		clearCanvas,
@@ -71,32 +61,26 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
 		useMouseLog();
 
-	const { drawBroadcastPath } = useBroadcastRenderer(
-		canvasState,
-		drawIncrementalPath,
-	);
+	const { drawBroadcastPath } = useBroadcastRenderer(drawIncrementalPath);
 
 	const roomPacketBuilder = useRoomPacketBuilder({ roomId: 'room2' });
-	const packetTransmitter = usePacketTransmitter(socket, canvasState);
+	const packetTransmitter = usePacketTransmitter(socket);
 	const { handlePacketSending } = packetTransmitter;
 
 	const drawTool = useDrawTool({
 		brushColor,
 		brushSize,
 		roomPacketBuilder,
-		canvasState,
 		drawDotOnCanvas,
 		drawIncrementalPath,
-		storeStrokeInterpolatedPoints,
 		handlePacketSending,
 	});
 
-	const collisionDetection = useCollisionDetection(canvasState);
+	const collisionDetection = useCollisionDetection();
 
 	const eraserManager = useEraserManager({
 		canvasWidth: 1800,
 		canvasHeight: 1000,
-		canvasState,
 		drawIncrementalPath,
 		drawDotOnCanvas,
 		collisionDetection,
@@ -112,7 +96,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 
 	const eraserTool = useEraserTool({
 		canvasRef,
-		canvasState,
 		eraserSize: brushSize,
 		eraserManager,
 		roomPacketBuilder,

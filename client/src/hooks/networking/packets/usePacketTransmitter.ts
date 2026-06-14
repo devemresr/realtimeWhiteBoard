@@ -2,10 +2,7 @@
 
 import { useCallback } from 'react';
 import { Socket } from 'socket.io-client';
-import {
-	CLIENT_EVENTS,
-	SERVER_EVENTS,
-} from '../../../../../shared/constants/socketIo.constant';
+import { CLIENT_EVENTS } from '../../../../../shared/constants/socketIo.constant';
 import logger from '../../../util/logger';
 import {
 	MessageStatus,
@@ -14,17 +11,14 @@ import {
 	CanvasEvent,
 	CanvasOperation,
 } from '@/types';
-import { useCanvasState } from '../../canvas/state/useCanvasState';
 import { useSocketEmit } from '../socket/useSocketEmit';
+import { canvasState } from 'src/util/canvas/CanvasState';
 
 export type HandlePacketSendingFn = ReturnType<
 	typeof usePacketTransmitter
 >['handlePacketSending'];
 
-const usePacketTransmitter = (
-	socket: Socket | null,
-	canvasState: ReturnType<typeof useCanvasState>,
-) => {
+const usePacketTransmitter = (socket: Socket | null) => {
 	const { emit } = useSocketEmit(socket);
 
 	const toNetworkDrawingPacket = (packet: CanvasOperation) => {

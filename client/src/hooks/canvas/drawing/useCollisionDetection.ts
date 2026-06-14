@@ -1,16 +1,9 @@
 import { useCallback } from 'react';
-import {
-	BoundingBox,
-	DrawingOperation,
-	DrawingPoint,
-	EraserPoint,
-} from '@/types';
+import { BoundingBox, DrawingPoint, EraserPoint } from '@/types';
 import logger from '../../../util/logger';
-import { useCanvasState } from '../state/useCanvasState';
+import { canvasState } from 'src/util/canvas/CanvasState';
 
-export const useCollisionDetection = (
-	canvasState: ReturnType<typeof useCanvasState>,
-) => {
+export const useCollisionDetection = () => {
 	const distanceToLineSegment = useCallback(
 		(p: EraserPoint, a: EraserPoint, b: EraserPoint): number => {
 			const dx = b.x - a.x;
@@ -93,7 +86,7 @@ export const useCollisionDetection = (
 
 			return false;
 		},
-		[distanceToLineSegment, canvasState],
+		[distanceToLineSegment],
 	);
 
 	const isEraserPathCollidingWithPacket = useCallback(
@@ -160,7 +153,7 @@ export const useCollisionDetection = (
 
 			return false;
 		},
-		[createBoundingBox, bboxesCollide, checkPointsCollision, canvasState],
+		[createBoundingBox, bboxesCollide, checkPointsCollision],
 	);
 
 	return {

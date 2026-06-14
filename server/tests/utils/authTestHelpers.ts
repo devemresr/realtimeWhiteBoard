@@ -25,7 +25,7 @@ export async function registerAndGetTokens(app: Server, user = TEST_USER) {
 	const res = await request(app).post(AUTH_API.REGISTER).send(user);
 
 	const accessToken: string = res.body.accessToken;
-	// supertest gives back set-cookie as an array of raw strings — grab the jwt one
+	// supertest gives back set-cookie as an array of raw strings - grab the jwt one
 	const rawCookies = res.headers['set-cookie'];
 
 	const cookies: string[] = Array.isArray(rawCookies)

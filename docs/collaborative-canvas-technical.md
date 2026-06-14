@@ -114,7 +114,7 @@ Each bulk write executes inside a MongoDB session with `ordered: true`, meaning 
 
 ### Retry logic
 
-On transient failures the pipeline retries up to three times with exponential backoff (200ms → 400ms → 800ms). A new session is created per attempt - a session that experienced a transient error is considered potentially dirty and never reused.
+On transient failures the pipeline retries up to three times with exponential backoff (200ms => 400ms => 800ms). A new session is created per attempt - a session that experienced a transient error is considered potentially dirty and never reused.
 
 Transient errors are classified by:
 
@@ -198,12 +198,12 @@ The HeartbeatService is a Redis-backed distributed presence and service registry
 
 ```
 ACTIVE_SERVERS_KEY  (ZSet)
-  score  → startupTime
-  member → serverId
+  score  => startupTime
+  member => serverId
 
 ACTIVE_SERVER_DATA  (Hash)
-  key   → serverId
-  value → JSON blob (port, startupTime, status, ...)
+  key   => serverId
+  value => JSON blob (port, startupTime, status, ...)
 ```
 
 ### Heartbeat cycle
