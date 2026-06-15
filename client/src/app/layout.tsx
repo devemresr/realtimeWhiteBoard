@@ -9,6 +9,9 @@ import { cursors } from '../components/config';
 import Modal from 'src/components/modal';
 import Menu from 'src/components/menu';
 // import { CanvasStateProvider } from 'src/contexts/CanvasStateContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 export default function RootLayout({ children }: { children: ReactNode }) {
 	const [queryClient] = useState(
 		() =>
@@ -41,11 +44,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }`}
 				</style>
 				<QueryClientProvider client={queryClient}>
-					{/* <CanvasStateProvider>
-						</CanvasStateProvider> */}
 					<Modal />
 					<Menu />
 					{children}
+					<ToastContainer
+						position='bottom-right'
+						autoClose={3000}
+						hideProgressBar={false}
+						closeOnClick
+						pauseOnHover
+					/>
 					{process.env.NODE_ENV === 'development' &&
 						createElement(ReactQueryDevtools as any, {
 							initialIsOpen: false,

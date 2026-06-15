@@ -1,31 +1,65 @@
 import { useCallback } from 'react';
-import { DrawingPoint, EraserPoint, CanvasOperationType } from '@/types';
+import { DrawingPoint, EraserPoint } from '@/types';
 import logger from '../../../util/logger';
-import { useCollisionDetection } from './useCollisionDetection';
-import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
+import { DrawIncrementalPathFn } from './useCanvasDrawing';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
+import { collisionDetection } from './CollisionDetection';
 
 interface EraserManagerProps {
-	canvasWidth: number;
-	canvasHeight: number;
-	drawDotOnCanvas: DrawDotOnCanvasFn;
 	drawIncrementalPath: DrawIncrementalPathFn;
-	collisionDetection: ReturnType<typeof useCollisionDetection>;
 	clearCanvas: () => void;
-	gridSize?: number;
-	onStrokeErased?: (strokeId: string) => void;
 }
 
-export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
-	const {
-		drawDotOnCanvas,
-		drawIncrementalPath,
-		collisionDetection,
-		clearCanvas,
-	} = eraserManagerProps;
+export type EraseWithInterpolatedPathFn = (
+	eraserInterpolatedPoints: EraserPoint[],
+	eraserSize?: number,
+) => string[];
 
-	const eraseWithInterpolatedPath = useCallback(
-		(eraserInterpolatedPoints: EraserPoint[], eraserSize: number = 1) => {
+export type EraseAtPointFn = (
+	point: EraserPoint,
+	eraserSize?: number,
+) => string[];
+
+export type EraseStrokeFn = (strokeId: string) => void;
+export type RedrawCanvasWithoutErasedStrokesFn = () => void;
+
+export const useEraserManager = ({
+	drawIncrementalPath,
+	clearCanvas,
+}: EraserManagerProps) => {
+	const redrawCanvasWithoutErasedStrokes =
+		useCallback<RedrawCanvasWithoutErasedStrokesFn>(() => {
+			clearCanvas();
+			const allNonErasedPackets = canvasState.getAllNonErasedDrawingPackets();
+			logger.debug('allNonErasedPackets', allNonErasedPackets);
+
+			allNonErasedPackets.forEach((packet) => {
+				const previousPacket = canvasState.getPreviousPacket(packet);
+				drawIncrementalPath(previousPacket, packet);
+			});
+		}, [clearCanvas, drawIncrementalPath]);
+
+	const eraseStroke = useCallback<EraseStrokeFn>((strokeId: string) => {
+		canvasState.markStrokeErased(strokeId);
+		canvasState.removeStrokeFromGrid(strokeId);
+	}, []);
+
+	/**
+	 * Erases strokes that collide with a dense interpolated eraser path.
+	 *
+	 * Use this for continuous eraser movement where multiple points have been
+	 * accumulated since the last erase check. The full eraser path is tested
+	 * against each nearby stroke packet in one pass, which is more efficient
+	 * than calling eraseAtPoint for every individual point.
+	 *
+	 * @returns Array of stroke IDs that were erased
+	 */
+	const eraseWithInterpolatedPath = useCallback<EraseWithInterpolatedPathFn>(
+		(
+			eraserInterpolatedPoints: EraserPoint[],
+			//todo pass the actaul eraserSize
+			eraserSize: number = 1,
+		): string[] => {
 			if (eraserInterpolatedPoints.length === 0) return [];
 
 			// Collect all nearby packets from ALL eraser points
@@ -46,7 +80,7 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 			}
 
 			logger.debug(
-				'@ allNearbyPackets from all eraser points',
+				'allNearbyPackets from all eraser points',
 				Array.from(allNearbyPackets.entries()).map(([strokeId, packetIds]) => ({
 					strokeId,
 					packetIds: Array.from(packetIds),
@@ -67,7 +101,7 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 					const strokePacketBBox = canvasState.getStrokeBoundingBox(strokeId);
 
 					if (!strokePacketBBox) {
-						logger.warn(`@ No bbox found for ${strokeId}/${canvasMessageId}`);
+						logger.warn(`No bbox found for ${strokeId}/${canvasMessageId}`);
 						return;
 					}
 
@@ -84,7 +118,7 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 					if (hasCollision) {
 						erasedStrokeIds.add(strokeId);
 						logger.debug(
-							`@ Collision detected for strokeId: ${strokeId}, canvasMessageId: ${canvasMessageId}`,
+							`Collision detected for strokeId: ${strokeId}, canvasMessageId: ${canvasMessageId}`,
 						);
 					}
 				});
@@ -97,16 +131,25 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 			});
 
 			if (erasedStrokeIds.size > 0) {
-				redrawCanvas();
+				redrawCanvasWithoutErasedStrokes();
 			}
 
 			return Array.from(erasedStrokeIds);
 		},
-		[],
+		[redrawCanvasWithoutErasedStrokes],
 	);
 
-	const eraseAtPoint = useCallback(
-		(point: EraserPoint, eraserSize: number = 1) => {
+	/**
+	 * Erases strokes that collide with a single eraser point.
+	 *
+	 * Use this for discrete tap/click erase events where there is no path to
+	 * interpolate. Slightly cheaper than eraseWithInterpolatedPath since it
+	 * skips the multi-point merge step.
+	 *
+	 * @returns Array of stroke IDs that were erased
+	 */
+	const eraseAtPoint = useCallback<EraseAtPointFn>(
+		(point: EraserPoint, eraserSize: number = 1): string[] => {
 			// Query spatial grid with single point
 			const nearbyPackets = canvasState.getPacketIdsNearPoint(point);
 
@@ -125,7 +168,7 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 					const strokePacketBBox = canvasState.getStrokeBoundingBox(strokeId);
 
 					if (!strokePacketBBox) {
-						logger.warn(`@ No bbox found for ${strokeId}/${canvasMessageId}`);
+						logger.warn(`No bbox found for ${strokeId}/${canvasMessageId}`);
 						return;
 					}
 
@@ -147,6 +190,7 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 						strokeId,
 						canvasMessageId,
 					).points;
+
 					// Check collision with interpolated stroke points
 					const hasCollision = collisionDetection.checkPointsCollision(
 						point,
@@ -159,14 +203,14 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 					if (hasCollision) {
 						erasedStrokeIds.add(strokeId);
 						logger.debug(
-							`@ Single point collision detected for strokeId: ${strokeId}, canvasMessageId: ${canvasMessageId}`,
+							`Single point collision detected for strokeId: ${strokeId}, canvasMessageId: ${canvasMessageId}`,
 						);
 					}
 				});
 			});
 
 			logger.debug(
-				'@ erasedStrokeIds from single point: ',
+				'erasedStrokeIds from single point: ',
 				Array.from(erasedStrokeIds),
 			);
 
@@ -176,34 +220,18 @@ export const useEraserManager = (eraserManagerProps: EraserManagerProps) => {
 			});
 
 			if (erasedStrokeIds.size > 0) {
-				redrawCanvas();
+				redrawCanvasWithoutErasedStrokes();
 			}
 
 			return Array.from(erasedStrokeIds);
 		},
-		[collisionDetection],
+		[eraseStroke, redrawCanvasWithoutErasedStrokes],
 	);
-
-	const eraseStroke = (strokeId: string) => {
-		canvasState.markStrokeErased(strokeId);
-		canvasState.removeStrokeFromGrid(strokeId);
-	};
-
-	const redrawCanvas = () => {
-		clearCanvas();
-		const allNonErasedPackets = canvasState.getAllNonErasedDrawingPackets();
-		logger.debug('allNonErasedPackets', allNonErasedPackets);
-
-		allNonErasedPackets.forEach((packet) => {
-			const previousPacket = canvasState.getPreviousPacket(packet);
-			drawIncrementalPath(previousPacket, packet);
-		});
-	};
 
 	return {
 		eraseStroke,
 		eraseWithInterpolatedPath,
 		eraseAtPoint,
-		redrawCanvas,
+		redrawCanvasWithoutErasedStrokes,
 	};
 };

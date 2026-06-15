@@ -16,17 +16,15 @@ import { CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
 import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
 import useMouseLog from '../hooks/debug/useMouseLog';
-import { useBroadcastRenderer } from '../hooks/networking/synchronization/useBroadcastPath';
-import { useRoomPacketBuilder } from '../hooks/networking/packets/usePacketBuilder';
+import { useBroadcastOrchestrator } from 'src/hooks/networking/synchronization/useBroadcastOrchestrator';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
 import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
 import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
-import { useEraserManager } from '../hooks/canvas/drawing/useEraserManager';
-import { useCollisionDetection } from '../hooks/canvas/drawing/useCollisionDetection';
 import logger from '../util/logger';
 import AttendeeList from './attendeeList';
 import { canvasBarItems, cursors } from './config';
+import { useEraserManager } from 'src/hooks/canvas/drawing/useEraserManager';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -61,45 +59,39 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
 		useMouseLog();
 
-	const { drawBroadcastPath } = useBroadcastRenderer(drawIncrementalPath);
+	const { drawBroadcastPath } = useBroadcastOrchestrator(drawIncrementalPath);
 
-	const roomPacketBuilder = useRoomPacketBuilder({ roomId: 'room2' });
 	const packetTransmitter = usePacketTransmitter(socket);
 	const { handlePacketSending } = packetTransmitter;
 
 	const drawTool = useDrawTool({
 		brushColor,
 		brushSize,
-		roomPacketBuilder,
 		drawDotOnCanvas,
 		drawIncrementalPath,
 		handlePacketSending,
 	});
 
-	const collisionDetection = useCollisionDetection();
-
-	const eraserManager = useEraserManager({
-		canvasWidth: 1800,
-		canvasHeight: 1000,
-		drawIncrementalPath,
-		drawDotOnCanvas,
-		collisionDetection,
-		clearCanvas,
-		gridSize: 100,
-	});
+	const {
+		eraseStroke,
+		eraseWithInterpolatedPath,
+		eraseAtPoint,
+		redrawCanvasWithoutErasedStrokes,
+	} = useEraserManager({ drawIncrementalPath, clearCanvas });
 
 	const { handleMessage } = useSocketSubscription(
 		socket,
 		drawBroadcastPath,
-		eraserManager,
+		eraseStroke,
+		redrawCanvasWithoutErasedStrokes,
 	);
 
 	const eraserTool = useEraserTool({
 		eraserSize: brushSize,
-		eraserManager,
-		roomPacketBuilder,
 		getEnrichedInterpolatedPoints,
 		packetTransmitter,
+		eraseWithInterpolatedPath,
+		eraseAtPoint,
 	});
 	const tools = useMemo<Partial<ToolHandlersMap>>(
 		() => ({

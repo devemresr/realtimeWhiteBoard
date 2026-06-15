@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { useRoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
+import { RoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
+
 import { DrawingOperation, DrawingPoint, CanvasOperationType } from '@/types';
 import { ToolInstance } from 'src/types/tool.types';
 import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
@@ -9,7 +10,6 @@ import { canvasState } from 'src/util/canvas/state/CanvasState';
 interface UseDrawToolProps {
 	brushColor: string;
 	brushSize: number;
-	roomPacketBuilder: ReturnType<typeof useRoomPacketBuilder>;
 	drawDotOnCanvas: DrawDotOnCanvasFn;
 	drawIncrementalPath: DrawIncrementalPathFn;
 	handlePacketSending: HandlePacketSendingFn;
@@ -18,13 +18,15 @@ interface UseDrawToolProps {
 export const useDrawTool = ({
 	brushColor,
 	brushSize,
-	roomPacketBuilder,
 	drawDotOnCanvas,
 	drawIncrementalPath,
 	handlePacketSending,
 }: UseDrawToolProps): ToolInstance => {
 	const [isDrawing, setIsDrawing] = useState(false);
 	const strokePointsRef = useRef<DrawingPoint[]>([]);
+	// todo pass the roomId from the zustand store
+	const builderRef = useRef(new RoomPacketBuilder({ roomId: 'room2' }));
+	const roomPacketBuilder = builderRef.current;
 
 	const startInteraction = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {

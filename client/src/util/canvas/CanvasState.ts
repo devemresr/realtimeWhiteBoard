@@ -8,9 +8,9 @@ import {
 } from '@/types';
 
 import { BoundingBoxStore } from './state/BoundingBoxStore';
-import { ErasureStore } from './ErasureStore';
+import { ErasureStore } from './state/ErasureStore';
 import { PacketStore } from './PacketStore';
-import { SpatialGrid } from './SpatialGrid';
+import { SpatialGrid } from './state/SpatialGrid';
 
 export type StoreStrokeInterpolatedPointsFn = (
 	strokeId: string,

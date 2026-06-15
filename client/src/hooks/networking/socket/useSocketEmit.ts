@@ -44,7 +44,7 @@ export function useSocketEmit(socket: Socket | null) {
 							console.log('ack: ', ack);
 
 							clearTimeout(timer);
-							if (ack?.success) {
+							if (ack) {
 								resolve();
 							} else {
 								reject(new Error('Acknowledgement failed'));

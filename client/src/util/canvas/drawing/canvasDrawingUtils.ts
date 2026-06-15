@@ -26,7 +26,7 @@ export const enrichInterpolatedPoints = <TPoint extends CanvasPoint>(
 ): TPoint[] => {
 	if (interpolatedPoints.length === 0) return [];
 
-	// Strip positional fields — keep only tool-specific metadata
+	// Strip positional fields - keep only tool-specific metadata
 	const { x, y, timestamp, ...additionalProps } = pointToExtractProperties;
 
 	return interpolatedPoints.map((point) => ({

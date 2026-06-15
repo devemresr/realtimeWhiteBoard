@@ -1,41 +1,58 @@
 import { useUserStore } from 'src/store/UserStore';
 
 export default function UploadAvatar({
+	avatar,
 	setAvatar,
 	size = 'm',
 }: {
+	avatar?: string;
+	setAvatar: (avatar: string) => void;
 	size?: 'm' | 'l';
-	setAvatar?: (avatar: string) => void;
 }) {
 	const userStore = useUserStore();
 	const user = userStore;
+
+	const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		const localUrl = URL.createObjectURL(file);
+		setAvatar(localUrl);
+		user.setUser({ avatar: localUrl });
+
+		const formData = new FormData();
+		formData.append('avatar', file);
+
+		// todo finish
+		const res = await fetch('/api/upload-avatar', {
+			method: 'POST',
+			body: formData,
+		});
+		const { url } = await res.json();
+		setAvatar(url);
+		user.setUser({ avatar: url });
+	};
+
 	return (
-		<div className='flex flex-col items-center'>
+		<div className='flex flex-col items-center gap-2'>
 			<img
 				src={
+					avatar ||
 					user.avatar ||
 					'https://cdn.vectorstock.com/i/500p/71/90/blank-avatar-placeholder-icon-vector-30257190.jpg'
 				}
 				alt='avatar preview'
-				className={`${size === 'm' ? 'w-20 h-20' : 'w-32 h-32'} aspect-square rounded-full`}
+				className={`${size === 'm' ? 'w-20 h-20' : 'w-32 h-32'} aspect-square rounded-full object-cover`}
 			/>
-			<button
-				className='text-gray-400 hover:text-gray-600 transition-colors'
-				onClick={() => {
-					// todo upload avatar and get url
-					if (setAvatar) {
-						setAvatar(
-							'https://images.ctfassets.net/h6goo9gw1hh6/2sNZtFAWOdP1lmQ33VwRN3/24e953b920a9cd0ff2e1d587742a2472/1-intro-photo-final.jpg?w=1200&h=992&fl=progressive&q=70&fm=jpg',
-						);
-					}
-					user.setUser({
-						avatar:
-							'https://images.ctfassets.net/h6goo9gw1hh6/2sNZtFAWOdP1lmQ33VwRN3/24e953b920a9cd0ff2e1d587742a2472/1-intro-photo-final.jpg?w=1200&h=992&fl=progressive&q=70&fm=jpg',
-					});
-				}}
-			>
+			<label className='text-gray-400 hover:text-gray-600 transition-colors cursor-pointer'>
 				Upload profile picture
-			</button>
+				<input
+					type='file'
+					accept='image/*'
+					className='hidden'
+					onChange={handleFileChange}
+				/>
+			</label>
 		</div>
 	);
 }

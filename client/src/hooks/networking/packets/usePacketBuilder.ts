@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
 	CanvasOperation,
@@ -31,78 +30,71 @@ interface RoomPacketOptions extends BasePacketOptions {
 }
 
 /**
- * Hook for creating packet builders in multiplayer room contexts
+ * Builds typed canvas operation packets for a single tool (drawing, eraser, lasso).
+ *
+ * Each tool hook should instantiate its own RoomPacketBuilder and hold it behind
+ * a useRef so the instance - and therefore the stroke/sequence state - survives
+ * re-renders without being shared across tools:
+ *
+ *   const builderRef = useRef(new RoomPacketBuilder({ roomId }));
+ *   use builderRef.current throughout the hook
+ *
+ * Keeping one instance per tool means there is no risk of one tool's
+ * createNewStrokeMetaData() call corrupting another tool's in-flight sequence numbers.
  */
-export const useRoomPacketBuilder = (options: RoomPacketOptions) => {
-	const strokeId = useRef<string>('');
-	const packetSequenceNumber = useRef(1);
-	const strokeSequenceNumber = useRef(1);
+export class RoomPacketBuilder {
+	private readonly roomId: string;
+	readonly POINTS_PER_PACKET: number;
 
-	const POINTS_PER_PACKET = options.pointsPerPacket ?? 2;
-	const roomId = 'room2'; // todo pass the actual roomId
+	/** Unique ID for the current stroke, reset on every new stroke */
+	private strokeId: string = '';
+	/** Increments with every packet emitted within a stroke, reset on new stroke */
+	private packetSequenceNumber: number = 1;
+	/** Increments with every new stroke, never reset */
+	private strokeSequenceNumber: number = 1;
 
-	const generateStrokeId = () => {
+	constructor(options: RoomPacketOptions) {
+		this.roomId = options.roomId; // todo pass the actual roomId
+		this.POINTS_PER_PACKET = options.pointsPerPacket ?? 2;
+	}
+
+	// ---------------------------------------------------------------------------
+	// Stroke lifecycle
+	// ---------------------------------------------------------------------------
+
+	private generateStrokeId(): string {
 		return `${Date.now()}-${uuidv4()}`;
-	};
+	}
 
-	const createNewStrokeMetaData = () => {
-		strokeId.current = generateStrokeId();
-		packetSequenceNumber.current = 1;
-		strokeSequenceNumber.current += 1;
-	};
+	/**
+	 * Must be called once at the start of every new stroke.
+	 * Resets the packet sequence counter and advances the stroke sequence counter.
+	 */
+	createNewStrokeMetaData(): void {
+		this.strokeId = this.generateStrokeId();
+		this.packetSequenceNumber = 1;
+		this.strokeSequenceNumber += 1;
+	}
 
-	const getCurrentStrokeId = () => {
-		return strokeId.current;
-	};
+	getCurrentStrokeId(): string {
+		return this.strokeId;
+	}
 
-	const buildPacketsFromPoints = <TPoint extends BasePoint, TPacket>(
-		points: TPoint[],
-		packetFactory: (points: TPoint[], sequenceNumber: number) => TPacket,
-	): {
-		packets: TPacket[];
-		remainingPoints: TPoint[];
-		packetSequenceNumber: number;
-	} => {
-		const packets: TPacket[] = [];
-		const completePackets = Math.floor(points.length / POINTS_PER_PACKET);
+	// ---------------------------------------------------------------------------
+	// Packet construction
+	// ---------------------------------------------------------------------------
 
-		for (let i = 0; i < completePackets; i++) {
-			const packetPoints = points.slice(
-				i * POINTS_PER_PACKET,
-				(i + 1) * POINTS_PER_PACKET,
-			);
-
-			const packet = packetFactory(packetPoints, packetSequenceNumber.current);
-			packets.push(packet);
-
-			packetSequenceNumber.current += 1;
-		}
-
-		const remainingPoints = points.slice(completePackets * POINTS_PER_PACKET);
-
-		return {
-			packets,
-			remainingPoints,
-			packetSequenceNumber: packetSequenceNumber.current,
-		};
-	};
-
-	const createPacket = <T extends CanvasOperationType>(
+	private createPacket<T extends CanvasOperationType>(
 		points: CanvasOperationTypeToPoints[T][],
 		seqNum: number,
 		type: T,
-		context: {
-			roomId: string;
-			strokeId: string;
-			strokeSequenceNumber: number;
-		},
-	) => {
+	): Extract<CanvasOperation, { type: T }> {
 		const basePacket = {
-			roomId: context.roomId,
-			strokeId: context.strokeId,
-			canvasMessageId: `${context.strokeId}-${seqNum}`,
+			roomId: this.roomId,
+			strokeId: this.strokeId,
+			canvasMessageId: `${this.strokeId}-${seqNum}`,
 			packetSequenceNumber: seqNum,
-			strokeSequenceNumber: context.strokeSequenceNumber,
+			strokeSequenceNumber: this.strokeSequenceNumber,
 			category: MessageCategory.DRAWING,
 			type,
 			authorId: 'anonymous',
@@ -112,71 +104,101 @@ export const useRoomPacketBuilder = (options: RoomPacketOptions) => {
 		} as const;
 
 		return basePacket as Extract<CanvasOperation, { type: T }>;
-	};
+	}
 
-	const buildPackets = <T extends CanvasOperationType>(
+	/**
+	 * Slices `points` into fixed-size packets using the configured POINTS_PER_PACKET.
+	 * Any leftover points that don't fill a complete packet are returned as remainingPoints
+	 * so the caller can carry them forward to the next batch.
+	 */
+	private buildPacketsFromPoints<TPoint extends BasePoint, TPacket>(
+		points: TPoint[],
+		packetFactory: (points: TPoint[], sequenceNumber: number) => TPacket,
+	): {
+		packets: TPacket[];
+		remainingPoints: TPoint[];
+		packetSequenceNumber: number;
+	} {
+		const packets: TPacket[] = [];
+		const completePackets = Math.floor(points.length / this.POINTS_PER_PACKET);
+
+		for (let i = 0; i < completePackets; i++) {
+			const packetPoints = points.slice(
+				i * this.POINTS_PER_PACKET,
+				(i + 1) * this.POINTS_PER_PACKET,
+			);
+
+			const packet = packetFactory(packetPoints, this.packetSequenceNumber);
+			packets.push(packet);
+
+			this.packetSequenceNumber += 1;
+		}
+
+		const remainingPoints = points.slice(
+			completePackets * this.POINTS_PER_PACKET,
+		);
+
+		return {
+			packets,
+			remainingPoints,
+			packetSequenceNumber: this.packetSequenceNumber,
+		};
+	}
+
+	private buildPackets<T extends CanvasOperationType>(
 		points: CanvasOperationTypeToPoints[T][],
 		type: T,
-	) => {
-		return buildPacketsFromPoints(points, (pts, seqNum) =>
-			createPacket(pts, seqNum, type, {
-				roomId,
-				strokeId: strokeId.current,
-				strokeSequenceNumber: strokeSequenceNumber.current,
-			}),
+	) {
+		return this.buildPacketsFromPoints(points, (pts, seqNum) =>
+			this.createPacket(pts, seqNum, type),
 		);
-	};
+	}
 
-	const buildStrokePackets = (points: DrawingPoint[]) => {
-		return buildPackets(points, CanvasOperationType.DRAWING);
-	};
+	buildStrokePackets(points: DrawingPoint[]) {
+		return this.buildPackets(points, CanvasOperationType.DRAWING);
+	}
 
-	const buildEraserPackets = (points: EraserPoint[]) => {
-		return buildPackets(points, CanvasOperationType.ERASER);
-	};
+	buildEraserPackets(points: EraserPoint[]) {
+		return this.buildPackets(points, CanvasOperationType.ERASER);
+	}
 
-	const buildLassoPackets = (points: LassoPoint[]) => {
-		return buildPackets(points, CanvasOperationType.LASSO);
-	};
+	buildLassoPackets(points: LassoPoint[]) {
+		return this.buildPackets(points, CanvasOperationType.LASSO);
+	}
 
-	const buildFinalPacket = <T extends CanvasOperationType>(
+	/**
+	 * Builds the final packet for a stroke, marked with isLastPacket: true.
+	 * Should be called once after all intermediate packets have been emitted.
+	 */
+	buildFinalPacket<T extends CanvasOperationType>(
 		points: CanvasPoint[],
 		type: T,
-	): Extract<CanvasOperation, { type: T }> => {
-		const authorId = 'anonymous';
-
+	): Extract<CanvasOperation, { type: T }> {
 		const basePacket = {
-			roomId,
-			strokeId: strokeId.current,
-			canvasMessageId: `${strokeId.current}-${packetSequenceNumber.current}`,
-			packetSequenceNumber: packetSequenceNumber.current,
-			strokeSequenceNumber: strokeSequenceNumber.current,
+			roomId: this.roomId,
+			strokeId: this.strokeId,
+			canvasMessageId: `${this.strokeId}-${this.packetSequenceNumber}`,
+			packetSequenceNumber: this.packetSequenceNumber,
+			strokeSequenceNumber: this.strokeSequenceNumber,
 			isLastPacket: true as const,
 			status: MessageStatus.CREATED,
 			category: MessageCategory.DRAWING,
-			authorId,
+			authorId: 'anonymous',
 			timestamp: Date.now(),
 			type,
 			points,
 		} as const;
 
 		return basePacket as Extract<CanvasOperation, { type: T }>;
-	};
-
-	return {
-		buildFinalPacket,
-		buildStrokePackets,
-		buildEraserPackets,
-		getCurrentStrokeId,
-		buildLassoPackets,
-		createNewStrokeMetaData,
-		POINTS_PER_PACKET,
-	};
-};
+	}
+}
 
 /**
- * Hook for creating packet builders in local/offline contexts
+ * Variant for local/offline contexts - uses a fixed 'local' roomId.
+ * Instantiate and hold behind a useRef exactly like RoomPacketBuilder.
  */
-export const useLocalPacketBuilder = (options: BasePacketOptions = {}) => {
-	return useRoomPacketBuilder({ ...options, roomId: 'local' });
-};
+export class LocalPacketBuilder extends RoomPacketBuilder {
+	constructor(options: BasePacketOptions = {}) {
+		super({ ...options, roomId: 'local' });
+	}
+}

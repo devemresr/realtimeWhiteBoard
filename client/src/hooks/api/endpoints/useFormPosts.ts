@@ -14,6 +14,8 @@ export type AuthRequest = {
 export type UserRegistrationRequest = AuthRequest & {
 	name: string;
 	surname: string;
+	username: string;
+	avatar: string;
 };
 
 export type JoinRoomRequest = {

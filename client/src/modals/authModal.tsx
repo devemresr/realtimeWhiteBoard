@@ -5,6 +5,8 @@ import CustomInput from 'src/components/customInput';
 import UploadAvatar from 'src/components/uploadAvatar';
 import { useUserStore } from 'src/store/UserStore';
 import { useModalStore } from 'src/store/ModalStore';
+import { useLogin, useRegister } from 'src/hooks/api/endpoints/useFormPosts';
+import { toast } from 'react-toastify';
 
 export default function AuthModal() {
 	const userStore = useUserStore();
@@ -15,31 +17,61 @@ export default function AuthModal() {
 			'https://cdn.vectorstock.com/i/500p/71/90/blank-avatar-placeholder-icon-vector-30257190.jpg',
 		name: '',
 		username: '',
+		surname: '',
 		email: '',
 		password: '',
+		confirmPassword: '',
 	});
 	const [formRegExPassed, setFormRegExPassed] = useState({
 		name: false,
 		username: false,
+		surname: false,
 		email: false,
 		password: false,
 	});
+
 	const isFormValid = authContent[authType].areas.every(
 		(area) => formRegExPassed[area],
 	);
-	const isPasswordCorrect = true; // todo handle password check
-	const handleLogin = () => {
-		userStore.setUser({
-			id: '', //todo get user info from backend
-			name: '',
-			username: '',
-			email: authForm.email,
-			avatar: '',
-		});
-		closeModal();
+	const isPasswordCorrect = authForm.password === authForm.confirmPassword;
+
+	const login = useLogin();
+	const handleLogin = async () => {
+		try {
+			await login.mutateAsync({
+				email: authForm.email,
+				password: authForm.password,
+			});
+			// todo setuser to store properly set isloggedin true
+			userStore.setUser({
+				id: '',
+				name: '',
+				username: '',
+				email: authForm.email,
+				avatar: '',
+			});
+			closeModal();
+			toast.success('Welcome back!');
+		} catch {
+			toast.error('Invalid email or password.');
+		}
 	};
-	const handleSignUp = () => {
-		if (isPasswordCorrect) {
+
+	const register = useRegister();
+	const handleSignUp = async () => {
+		if (!isPasswordCorrect) {
+			toast.error('Passwords do not match.');
+			return;
+		}
+		try {
+			await register.mutateAsync({
+				email: authForm.email,
+				password: authForm.password,
+				name: authForm.name,
+				surname: authForm.surname,
+				username: authForm.username,
+				avatar: authForm.avatar,
+			});
 			userStore.setUser({
 				id: 'user-id',
 				name: authForm.name,
@@ -48,20 +80,29 @@ export default function AuthModal() {
 				avatar: authForm.avatar,
 			});
 			closeModal();
-		} // todo backend integration for sign up
+			toast.success('Account created successfully!');
+		} catch {
+			toast.error('Registration failed. Please try again.');
+		}
 	};
-	const handleAuthForm = (e) => {
+
+	const handleAuthForm = (e: React.ChangeEvent<HTMLInputElement>) => {
+		const trimmed = e.target.value.trim();
 		setAuthForm((prev) => ({
 			...prev,
-			[e.target.name]: e.target.value,
+			[e.target.name]: trimmed,
 		}));
 		setFormRegExPassed((prev) => ({
 			...prev,
-			[e.target.name]: authFormData[e.target.name].validationRegex.test(
-				e.target.value,
-			),
+			[e.target.name]:
+				authFormData[e.target.name].validationRegex.test(trimmed),
 		}));
 	};
+
+	const nameAndSurnameAreas = ['name', 'surname'] as const;
+	const remainingAreas = authContent[authType].areas.filter(
+		(area) => area !== 'name' && area !== 'surname',
+	);
 
 	return (
 		<div className='flex flex-col gap-4'>
@@ -73,6 +114,7 @@ export default function AuthModal() {
 			</div>
 			{authType === 'signUp' && (
 				<UploadAvatar
+					avatar={authForm.avatar}
 					setAvatar={(url) =>
 						setAuthForm((prev) => ({
 							...prev,
@@ -81,28 +123,80 @@ export default function AuthModal() {
 					}
 				/>
 			)}
-
-			{authContent[authType].areas.map((area) => {
+			{authType === 'signUp' && (
+				<div className='flex flex-col gap-1'>
+					<div className='flex gap-2'>
+						{nameAndSurnameAreas.map((area) => {
+							const value = authForm[area];
+							const isEmpty = !value || value.length === 0;
+							const isValid = formRegExPassed[area];
+							const isInvalid = !isEmpty && !isValid;
+							return (
+								<CustomInput
+									key={area}
+									title={authFormData[area].title}
+									isInvalid={isInvalid}
+									area={area}
+									placeholder={authFormData[area].placeholder}
+									onChange={handleAuthForm}
+									value={value}
+									validationMessage={null} // suppress inline message
+								/>
+							);
+						})}
+					</div>
+					{/* Render validation messages below the row */}
+					{nameAndSurnameAreas.map((area) => {
+						const value = authForm[area];
+						const isEmpty = !value || value.length === 0;
+						const isInvalid = !isEmpty && !formRegExPassed[area];
+						return isInvalid ? (
+							<p key={`${area}-error`} className='text-red-500 text-xs'>
+								<span className='font-medium capitalize'>{area}:</span>{' '}
+								{authFormData[area].validationMessage}
+							</p>
+						) : null;
+					})}
+				</div>
+			)}
+			{remainingAreas.map((area) => {
 				const value = authForm[area];
 				const isEmpty = !value || value.length === 0;
 				const isValid = formRegExPassed[area];
 				const isInvalid = !isEmpty && !isValid;
 				return (
 					<CustomInput
-						key={area + 100}
+						key={area}
 						title={authFormData[area].title}
 						isInvalid={isInvalid}
 						area={area}
 						placeholder={authFormData[area].placeholder}
-						onChange={(e) => handleAuthForm(e)}
+						onChange={handleAuthForm}
 						value={value}
 						validationMessage={authFormData[area].validationMessage}
 					/>
 				);
 			})}
+			{authType === 'signUp' && (
+				<CustomInput
+					key='confirmPassword'
+					title='Confirm Password'
+					isInvalid={!isPasswordCorrect && authForm.confirmPassword.length > 0}
+					area='confirmPassword'
+					placeholder='Re-enter your password'
+					onChange={(e) =>
+						setAuthForm((prev) => ({
+							...prev,
+							confirmPassword: e.target.value.trim(),
+						}))
+					}
+					value={authForm.confirmPassword}
+					validationMessage='Passwords do not match'
+				/>
+			)}
 			<button
-				className='bg-purple-500 text-white rounded-lg py-2 px-4 hover:bg-purple-600 transition-colors  disabled:bg-gray-300 disabled:text-gray-500'
-				disabled={!isFormValid}
+				className='bg-purple-500 text-white rounded-lg py-2 px-4 hover:bg-purple-600 transition-colors disabled:bg-gray-300 disabled:text-gray-500'
+				disabled={!isFormValid || (authType === 'signUp' && !isPasswordCorrect)}
 				onClick={() => {
 					if (authType === 'signIn') {
 						handleLogin();

@@ -61,34 +61,6 @@ services:
         done;
         exit 1
       "
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "3010:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.dev.conf:ro
-    depends_on:
-      - realtime_whiteboard
-    restart: unless-stopped
-    networks:
-      - dev_network
-
-  realtime_whiteboard:
-    depends_on:
-      mongo:
-        condition: service_healthy
-      mongo-init:
-        condition: service_completed_successfully
-    build: .
-    expose:
-      - "3001"
-    environment:
-      - REDIS_HOST=redis_main
-      - REDIS_PORT=6379
-      - REDIS_ADAPTER_HOST=redis_adapter
-      - REDIS_ADAPTER_PORT=6379
-    networks:
-      - dev_network
 
   prometheus:
     image: prom/prometheus:latest

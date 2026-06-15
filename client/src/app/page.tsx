@@ -12,9 +12,9 @@ import { SOCKET_CONFIG } from 'src/constants/socket.config';
 const whiteBoardApp = () => {
 	const [socket, setSocket] = useState<Socket | null>(null);
 	const [connected, setConnected] = useState(false);
-	const [token, setToken] = useState<string | null>(
-		() => localStorage.getItem('accessToken'), // lazy init, matches what the socket already used
-	);
+	// const [token, setToken] = useState<string | null>(
+	// 	() => localStorage.getItem('accessToken'), // lazy init, matches what the socket already used
+	// );
 	const [socketId, setSocketId] = useState('');
 	const [error, setError] = useState<string | null>(null);
 	// Ref to store the latest connected state (avoids stale closure)
@@ -30,7 +30,7 @@ const whiteBoardApp = () => {
 			{
 				...SOCKET_CONFIG,
 				// todo change localstorage to zustand
-				auth: { token: localStorage.getItem('accessToken') },
+				// auth: { token: localStorage.getItem('accessToken') },
 			},
 		);
 
@@ -98,13 +98,13 @@ const whiteBoardApp = () => {
 		};
 	}, []);
 
-	useEffect(() => {
-		console.log(' token effect fired, token:', token, 'socket:', !!socket);
-		if (!socket || !token) return;
-		// just update auth on existing socket, don't recreate
-		socket.auth = { token };
-		socket.disconnect().connect(); // reconnect with new token
-	}, [token]); // token changes only trigger re-auth
+	// useEffect(() => {
+	// 	console.log(' token effect fired, token:', token, 'socket:', !!socket);
+	// 	if (!socket || !token) return;
+	// 	// just update auth on existing socket, don't recreate
+	// 	socket.auth = { token };
+	// 	socket.disconnect().connect(); // reconnect with new token
+	// }, [token]); // token changes only trigger re-auth
 
 	return <>{socket && <Canvas socket={socket} />}</>;
 };

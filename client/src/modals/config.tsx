@@ -12,7 +12,7 @@ export const authContent: Record<AuthContentTypes, AuthContent> = {
 	signUp: {
 		title: 'Sign Up',
 		text: 'Welcome! Enter your details to create a new account.',
-		areas: ['name', 'username', 'email', 'password'],
+		areas: ['name', 'surname', 'username', 'email', 'password'],
 		changeTypeText: ['Already have an account?', 'Sign in'],
 		setType: 'signIn',
 		buttonText: 'Create',
@@ -20,11 +20,18 @@ export const authContent: Record<AuthContentTypes, AuthContent> = {
 };
 export const authFormData: AuthFormData = {
 	name: {
-		placeholder: 'Name Surname',
+		placeholder: 'Name',
 		title: 'Name',
 		validationRegex: /^[A-Za-z\s]{3,28}$/,
 		validationMessage:
 			'Name must be 3-28 characters long and contain only letters and spaces.',
+	},
+	surname: {
+		placeholder: 'Surname',
+		title: 'Surname',
+		validationRegex: /^[A-Za-z\s]{2,28}$/,
+		validationMessage:
+			'Surname must be 2-28 characters and contain only letters.',
 	},
 	username: {
 		placeholder: 'Username123',

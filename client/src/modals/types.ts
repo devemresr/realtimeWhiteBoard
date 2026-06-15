@@ -1,4 +1,9 @@
-export type AuthFormKeys = 'name' | 'username' | 'email' | 'password';
+export type AuthFormKeys =
+	| 'name'
+	| 'username'
+	| 'email'
+	| 'password'
+	| 'surname';
 export type AuthContentTypes = 'signIn' | 'signUp';
 export type AuthContent = {
 	title: string;

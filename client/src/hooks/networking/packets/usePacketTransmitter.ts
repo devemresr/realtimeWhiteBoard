@@ -67,7 +67,7 @@ const usePacketTransmitter = (socket: Socket | null) => {
 				});
 			}
 		},
-		[socket, emit],
+		[emit],
 	);
 
 	const sendEventPacket = useCallback(
@@ -83,7 +83,7 @@ const usePacketTransmitter = (socket: Socket | null) => {
 				});
 			}
 		},
-		[socket, emit],
+		[emit],
 	);
 
 	const sendPacket = useCallback(
@@ -100,7 +100,7 @@ const usePacketTransmitter = (socket: Socket | null) => {
 					return sendEventPacket(packet);
 			}
 		},
-		[socket, sendDrawingPacket, sendEventPacket],
+		[sendDrawingPacket, sendEventPacket],
 	);
 
 	const handlePacketSending = useCallback(() => {

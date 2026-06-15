@@ -58,6 +58,7 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 			let pointBrushSize: number;
 
 			switch (type) {
+				// todo pass the actual brushSize
 				case CanvasOperationType.DRAWING:
 					const firstPoint = point as DrawingPoint;
 					pointBrushColor = firstPoint.brushColor;
@@ -76,7 +77,7 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 			ctx.fillStyle = pointBrushColor;
 			ctx.fill();
 		},
-		[brushColor, updateContextProps, ctxRef],
+		[brushColor, updateContextProps],
 	);
 
 	/**
@@ -124,12 +125,12 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 			}
 			ctx.stroke();
 		},
-		[updateContextProps, drawDotOnCanvas, brushColor, ctxRef],
+		[updateContextProps, drawDotOnCanvas, brushColor],
 	);
 
 	/**
 	 * Interpolates between two consecutive packets and enriches the resulting
-	 * base points with tool metadata. Does not draw — pure data transformation.
+	 * base points with tool metadata. Does not draw - pure data transformation.
 	 *
 	 * Supports:
 	 * - DrawingPoint: brushColor, brushSize
