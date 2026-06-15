@@ -13,7 +13,7 @@ export const CACHE_KEYS = {
 	USER_ACTIVITY_BITMAP: (userId: string) => `user:retention:${userId}`,
 
 	// room scope.
-	// cached room document
+	// cached room document not the roomMetadata document
 	ROOM_DATA: (roomId: string) => `room:${roomId}`,
 
 	ACTIVE_ROOMS: 'activeRooms', // Sorted Set, score = lastActivityAt timestamp

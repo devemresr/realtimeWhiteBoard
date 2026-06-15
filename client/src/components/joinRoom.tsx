@@ -2,38 +2,31 @@ import { useEffect, useState } from 'react';
 import CustomInput from './customInput';
 import CustomPagination from './customPagination';
 import { FaRegUser } from 'react-icons/fa';
+import { useGetRooms } from 'src/hooks/api/endpoints/useFormPosts';
+import logger from 'src/util/loggerTest';
 
-export default function JoinRoom({
-	roomForm,
-	handleRoomForm,
-}: {
-	roomForm: any;
-	handleRoomForm: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
+export default function JoinRoom() {
+	const [roomForm, setRoomForm] = useState({ code: '', password: '' });
+	const [listPasswords, setListPasswords] = useState<Record<string, string>>(
+		{},
+	);
+
 	const [foundRoom, setFoundRoom] = useState(null);
 	const [showPassword, setShowPassword] = useState(false);
+
 	useEffect(() => {
-		// todo check if the room is real
 		const timer = setTimeout(() => {
 			if (!roomForm.code) {
 				setFoundRoom(null);
 				setShowPassword(false);
 				return;
 			}
-
 			const room = dummyRooms.find(
 				(r) => r.code.toLowerCase() === roomForm.code.toLowerCase(),
 			);
-
 			setFoundRoom(room || null);
-
-			if (room && room.password && room.password.length > 0) {
-				setShowPassword(true);
-			} else {
-				setShowPassword(false);
-			}
+			setShowPassword(!!room?.password?.length);
 		}, 700);
-
 		return () => clearTimeout(timer);
 	}, [roomForm.code]);
 	const dummyRooms = [
@@ -182,56 +175,92 @@ export default function JoinRoom({
 			memberCount: 3,
 		},
 	];
-	const publicRooms = dummyRooms.filter((room) => !room.private);
+
+	const handleRoomFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		setRoomForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+	};
+
+	const handleListPasswordChange = (code: string, value: string) => {
+		setListPasswords((prev) => ({ ...prev, [code]: value }));
+	};
+
+	const handleSelectRoom = (code: string) => {
+		setSelectedRoomCode((prev) => (prev === code ? null : code));
+		// Don't carry over a password from a previously selected room
+		setListPasswords((prev) => {
+			const next = { ...prev };
+			delete next[code];
+			return next;
+		});
+	};
+
+	const handleJoinByCode = () => {
+		if (!foundRoom) return;
+		const password = roomForm.password;
+		// join logic here
+		// todo add api call for join
+	};
+
+	// List flow
+	const handleJoinFromList = (room) => {
+		const password = listPasswords[room.code] ?? '';
+		// join logic here
+	};
+
+	const { data, isLoading, isError, error } = useGetRooms();
+	const publicRooms = data?.rooms ?? [];
 	const [paginationPageNumber, setPaginationPageNumber] = useState(1);
-	const [selectedRoomCode, setSelectedRoomCode] = useState(null);
-	const itemsPerPage = 3;
+	const [selectedRoomCode, setSelectedRoomCode] = useState<string | null>(null);
+	const itemsPerPage = 5;
 	const lastIndex = paginationPageNumber * itemsPerPage;
 	const firstIndex = lastIndex - itemsPerPage;
 	const paginatedRooms = publicRooms.slice(firstIndex, lastIndex);
 	const pageAmount = Math.ceil(publicRooms.length / itemsPerPage);
-	const handleJoinRoom = () => {};
 	return (
 		<div>
 			<div className='flex flex-col gap-2'>
 				<div className='flex flex-row gap-2 pt-2'>
 					<CustomInput
 						area='code'
+						title='code'
 						placeholder='Room Code'
-						onChange={(e) => handleRoomForm(e)}
+						onChange={handleRoomFormChange}
 						value={roomForm.code}
-						className={`w-full`}
+						className='w-full'
 					/>
 					<button
 						disabled={!foundRoom}
-						onClick={handleJoinRoom}
-						className='bg-purple-500 self-end text-white px-4 py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out  disabled:bg-gray-300 disabled:text-gray-500'
+						onClick={handleJoinByCode}
+						className='bg-purple-500 self-end text-white px-4 py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out disabled:bg-gray-300 disabled:text-gray-500'
 					>
 						Join
 					</button>
 				</div>
-				{showPassword && ( //only show password area if password is required
+				{showPassword && (
 					<CustomInput
 						area='password'
+						title='password'
 						placeholder='Password'
-						onChange={handleRoomForm}
+						onChange={handleRoomFormChange}
 						value={roomForm.password}
 						className='w-full'
 					/>
 				)}
 			</div>
+
 			<div className='w-full h-0.5 bg-gray-200 my-2' />
+
 			<div className='flex flex-col gap-4 pt-2 overflow-hidden'>
 				{paginatedRooms.map((room) => {
 					const isSelected = selectedRoomCode === room.code;
 					return (
-						<button
-							key={room.id}
+						<div
+							key={room.roomId}
 							className='border border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow duration-300 ease-in-out'
-							onClick={() => setSelectedRoomCode(room.code)}
+							onClick={() => handleSelectRoom(room.code)}
 						>
 							<span className='flex justify-between items-center'>
-								<h3 className=''>{room.name}</h3>
+								<h3>{room.name}</h3>
 								<div className='flex items-baseline gap-1'>
 									<FaRegUser
 										style={{ position: 'relative', top: 1 }}
@@ -241,41 +270,51 @@ export default function JoinRoom({
 									<p className='text-gray-600'>{room.memberCount}</p>
 								</div>
 							</span>
-							{isSelected && ( // only the selected room shows
+
+							{isSelected && (
 								<p className='text-gray-500 text-left text-sm'>{room.code}</p>
 							)}
-							{!!room.password && (
-								<div
-									className={`flex gap-2 items-center-safe transition-all duration-400 ease-in-out ${isSelected ? 'max-h-40 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}
-								>
-									<CustomInput
-										area='password'
-										placeholder='Password'
-										onChange={(e) => handleRoomForm(e)}
-										value={roomForm.password}
-										className='w-full'
-									/>
+
+							<div
+								className={`transition-all duration-400 ease-in-out overflow-hidden ${
+									isSelected ? 'max-h-40 opacity-100 mt-2' : 'max-h-0 opacity-0'
+								}`}
+							>
+								{!!room.password ? (
+									<div className='flex gap-2 items-center'>
+										<CustomInput
+											area='password'
+											title='password'
+											placeholder='Password'
+											onChange={(e) =>
+												handleListPasswordChange(room.code, e.target.value)
+											}
+											value={listPasswords[room.code] ?? ''}
+											className='w-full'
+										/>
+										<button
+											onClick={(e) => {
+												e.stopPropagation();
+												handleJoinFromList(room);
+											}}
+											className='bg-purple-500 self-end text-white px-4 py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out'
+										>
+											Join
+										</button>
+									</div>
+								) : (
 									<button
-										onClick={handleJoinRoom}
-										className='bg-purple-500 self-end text-white px-4 py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out'
+										onClick={(e) => {
+											e.stopPropagation();
+											handleJoinFromList(room);
+										}}
+										className='w-full bg-purple-500 text-white py-1.5 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out'
 									>
 										Join
 									</button>
-								</div>
-							)}
-							{!room.password && (
-								<div //needs wrapper for animation to work properly
-									className={`transition-all duration-400 ease-in-out ${isSelected ? 'max-h-40 opacity-100 mt-2 py-2' : 'max-h-0 opacity-0'}`}
-								>
-									<button
-										onClick={handleJoinRoom}
-										className={`w-full bg-purple-500 self-end text-white rounded-lg hover:bg-purple-600 transition-color duration-300 ease-in-out ${isSelected ? 'py-1.5' : ''}`}
-									>
-										Join
-									</button>
-								</div>
-							)}
-						</button>
+								)}
+							</div>
+						</div>
 					);
 				})}
 				<CustomPagination

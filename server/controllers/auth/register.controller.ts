@@ -10,7 +10,7 @@ const log = logger.child({ method: 'registerController' });
 
 const register = async (req: Request, res: Response) => {
 	try {
-		const { email, password, name, surname, avatarUrl } = req.body;
+		const { email, password, name, surname, avatarUrl, username } = req.body;
 
 		const isExistingUser = await User.findOne({
 			email,
@@ -26,6 +26,7 @@ const register = async (req: Request, res: Response) => {
 		const newUser = await User.create({
 			password: hashedPassword,
 			email,
+			username,
 			name,
 			surname,
 			avatarUrl: avatarUrl ?? null,

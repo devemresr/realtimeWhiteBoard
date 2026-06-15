@@ -15,8 +15,18 @@ export type UserRegistrationRequest = AuthRequest & {
 	name: string;
 	surname: string;
 	username: string;
-	avatar: string;
+	avatarUrl: string;
 };
+
+export type userData = UserRegistrationRequest & {
+	email: string;
+	_id: string;
+};
+
+// todo add these
+// export type GetRoomsResponse = {
+// 	rooms: RoomListItem[];
+// };
 
 export type JoinRoomRequest = {
 	roomId: string;
@@ -24,9 +34,8 @@ export type JoinRoomRequest = {
 };
 
 export type AuthResponse = {
-	id: string;
 	accessToken: string;
-	message: string;
+	user: userData;
 };
 
 export function useRegister() {
@@ -51,12 +60,6 @@ export function useGetOnboardingData() {
 		enabled: false, // Don't auto-fetch on mount, only when manually triggered
 	});
 }
-export function useGetNonArchivedRooms() {
-	return useApiQuery({
-		url: ROOM_ROUTES.LIST_ACTIVE,
-		requiresAuth: true,
-	});
-}
 
 export function useJoinRoom() {
 	return useApiMutation<unknown, JoinRoomRequest>({
@@ -74,6 +77,12 @@ export function useCreateRoom() {
 export function useGetMissingPacket() {
 	return useApiQuery({
 		url: ROOM_ROUTES.GET_MISSING_PACKET,
+		requiresAuth: process.env.NODE_ENV === 'production',
+	});
+}
+export function useGetRooms() {
+	return useApiQuery({
+		url: ROOM_ROUTES.LIST_ACTIVE,
 		requiresAuth: process.env.NODE_ENV === 'production',
 	});
 }

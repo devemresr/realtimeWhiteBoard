@@ -74,7 +74,7 @@ export default function CollabModal() {
 				{CollabMode === 'create' ? (
 					<CreateRoom roomForm={roomForm} handleRoomForm={handleRoomForm} />
 				) : (
-					<JoinRoom roomForm={roomForm} handleRoomForm={handleRoomForm} />
+					<JoinRoom />
 				)}
 			</div>
 		</div>

@@ -21,10 +21,11 @@ import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitt
 import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
 import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
-import logger from '../util/logger';
+import logger from 'src/util/loggerTest';
 import AttendeeList from './attendeeList';
 import { canvasBarItems, cursors } from './config';
 import { useEraserManager } from 'src/hooks/canvas/drawing/useEraserManager';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -32,6 +33,8 @@ interface ChildComponentProps {
 
 export default function Canvas({ socket }: ChildComponentProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const isCanvasResizingRef = useRef(false);
+	const isCanvasReadyRef = useRef(false);
 	const [selectedElement, setSelectedElement] = useState<ToolType>('draw');
 	const [brushShape, setBrushShape] = useState<CanvasShapeKeys>('square');
 	const [textStyle, setTextStyle] = useState({
@@ -98,26 +101,86 @@ export default function Canvas({ socket }: ChildComponentProps) {
 			draw: drawTool,
 			erase: eraserTool,
 		}),
-		[drawTool],
+		[drawTool, eraserTool],
 	);
 
-	const getOnboardingDataQuerry = useGetOnboardingData();
+	// const getOnboardingDataQuerry = useGetOnboardingData();
 
-	// hook to get onboarding data
-	const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
-		getOnboardingDataQuerry,
-		handleMessage,
-	);
-
-	// Handler for onboarding button
 	useEffect(() => {
-		loadOnboardingData().catch((error) => {
-			logger.error('Failed to load onboarding data on mount', error);
-		});
+		if (!canvasRef.current) return;
+		const { width, height } = canvasRef.current.getBoundingClientRect();
+		console.log(
+			'first update updateDimensions with: width height',
+			width,
+			height,
+		);
+		canvasState.updateDimensions(width, height);
+		isCanvasReadyRef.current = true;
 	}, []);
 
+	useEffect(() => {
+		if (!canvasRef.current) return;
+
+		let timer: NodeJS.Timeout;
+
+		const observer = new ResizeObserver(([entry]) => {
+			const { width, height } = entry.contentRect;
+			isCanvasResizingRef.current = true;
+			isCanvasReadyRef.current = false;
+
+			clearTimeout(timer);
+			timer = setTimeout(() => {
+				logger.debug(
+					{ width, height },
+					'updating updateDimensions width height',
+				);
+				// update the canvas element's internal resolution to match display size
+				canvasRef.current.width = width;
+				canvasRef.current.height = height;
+
+				canvasState.updateDimensions(width, height);
+
+				logger.debug('clearing canvas');
+				redrawCanvasWithoutErasedStrokes();
+				logger.debug('redrawing');
+
+				isCanvasResizingRef.current = false;
+				isCanvasReadyRef.current = true;
+			}, 100);
+		});
+
+		observer.observe(canvasRef.current);
+
+		return () => {
+			observer.disconnect();
+			clearTimeout(timer); // cleanup pending debounce on unmount
+		};
+	}, [redrawCanvasWithoutErasedStrokes]);
+
+	// hook to get onboarding data
+	// const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
+	// 	getOnboardingDataQuerry,
+	// 	handleMessage,
+	// );
+	// Handler for onboarding button
+	// useEffect(() => {
+	// 	loadOnboardingData().catch((error) => {
+	// 		logger.error('Failed to load onboarding data on mount', error);
+	// 	});
+	// }, []);
+	const canUseCanvas = useCallback(() => {
+		const canvas = canvasRef.current;
+
+		return Boolean(
+			canvas &&
+			isCanvasReadyRef.current &&
+			!isCanvasResizingRef.current &&
+			canvas.width > 0 &&
+			canvas.height > 0,
+		);
+	}, []);
 	const startInteraction = (e: React.PointerEvent<HTMLCanvasElement>) => {
-		if (!ctxRef.current) return;
+		if (!canUseCanvas()) return;
 		const currentTool = tools[selectedElement];
 		currentTool?.startInteraction?.(e);
 	};
@@ -135,7 +198,15 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		(item) => item.key === selectedElement,
 	).cursor;
 	return (
-		<div className='flex relative'>
+		<div
+			className='flex relative'
+			style={{
+				width: '100vw',
+				height: '100vh',
+				position: 'relative',
+				overflow: 'hidden',
+			}}
+		>
 			<style>
 				{` /* Apply custom cursor to canvas */
           canvas {
@@ -167,8 +238,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				onContextMenu={(e) => e.preventDefault()}
 				aria-label='canvas'
 				ref={canvasRef}
-				width={1800}
-				height={1000}
 				onPointerDown={startInteraction}
 				onPointerMove={(e) => {
 					interact(e);
@@ -176,7 +245,12 @@ export default function Canvas({ socket }: ChildComponentProps) {
 				}}
 				onPointerUp={stopInteraction}
 				onPointerLeave={stopInteraction}
-				style={{ touchAction: 'none' }} // prevents default touch behaviors
+				style={{
+					width: '100%',
+					height: '100%',
+					display: 'block',
+					touchAction: 'none', // prevents default touch behaviors
+				}}
 				className='border border-gray-300'
 			/>
 

@@ -6,7 +6,7 @@ const isPrettyLog = process.env.NODE_ENV !== 'production';
 const logger = pino({
 	level:
 		process.env.LOG_LEVEL ??
-		(env === 'development' || 'test' ? 'debug' : 'info'),
+		(env === 'development' || env === 'test' ? 'debug' : 'info'),
 
 	// Pretty printing for development
 	...(isPrettyLog && {

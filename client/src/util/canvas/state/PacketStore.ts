@@ -7,6 +7,7 @@ import {
 } from '@/types';
 import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
+import logger from 'src/util/loggerTest';
 
 /**
  * PacketStore
@@ -59,23 +60,20 @@ export class PacketStore {
 	 * Also registers the packet in the appropriate status index and, for drawing
 	 * packets, triggers a bounding-box update.
 	 */
-	store(packet: CanvasOperation) {
+	storePacket(packet: CanvasOperation) {
+		// Drawing packets need a spatial index entry so the eraser can find them
+
 		let packetMap = this.allPackets.get(packet.strokeId);
 		if (!packetMap) {
 			packetMap = new Map();
 			this.allPackets.set(packet.strokeId, packetMap);
 		}
 
+		logger.debug(
+			{ packet },
+			'before storing into the allPacket inside packetStore: ',
+		);
 		packetMap.set(packet.canvasMessageId, packet);
-
-		// Drawing packets need a spatial index entry so the eraser can find them
-		if (packet.type === CanvasOperationType.DRAWING) {
-			this.boundingBoxStore.update(
-				packet.strokeId,
-				packet.canvasMessageId,
-				packet.points,
-			);
-		}
 
 		// Register in the appropriate status index
 		if (packet.status === MessageStatus.CREATED) {
@@ -89,7 +87,7 @@ export class PacketStore {
 	 * Transition a packet to a new status, keeping both indexes consistent.
 	 * Returns false when the packet cannot be found.
 	 */
-	updateStatus(
+	updatePacketStatus(
 		actionId: string,
 		canvasMessageId: string,
 		status: MessageStatus,
@@ -154,7 +152,10 @@ export class PacketStore {
 	}
 
 	// PACKET RETRIEVAL - Direct Lookups
-	get(actionId: string, canvasMessageId: string): CanvasOperation | undefined {
+	getPacket(
+		actionId: string,
+		canvasMessageId: string,
+	): CanvasOperation | undefined {
 		return this.allPackets.get(actionId)?.get(canvasMessageId) as
 			| CanvasOperation
 			| undefined;
@@ -164,15 +165,15 @@ export class PacketStore {
 	 * Look up the packet that immediately precedes the given one in the sequence.
 	 * Returns undefined for the first packet in a stroke (sequence number 1).
 	 */
-	getPrevious(packet: CanvasOperation): CanvasOperation | undefined {
+	getPreviousPacket(packet: CanvasOperation): CanvasOperation | undefined {
 		if (packet.packetSequenceNumber === 1) return undefined;
 
 		const prevId = `${packet.strokeId}-${packet.packetSequenceNumber - 1}`;
-		return this.get(packet.strokeId, prevId);
+		return this.getPacket(packet.strokeId, prevId);
 	}
 
 	/** Convenience helper: returns just the raw points for a packet. */
-	getPoints(
+	getPacketPoints(
 		actionId: string,
 		canvasMessageId: string,
 	): CanvasOperation['points'] | undefined {
@@ -252,7 +253,7 @@ export class PacketStore {
 			if (!pendingPackets) continue;
 
 			for (const canvasMessageId of pendingPackets) {
-				const packet = this.get(actionId, canvasMessageId);
+				const packet = this.getPacket(actionId, canvasMessageId);
 				if (packet) result.push(packet);
 			}
 		}
@@ -269,7 +270,7 @@ export class PacketStore {
 			if (!needsRetryPackets) continue;
 
 			for (const canvasMessageId of needsRetryPackets) {
-				const packet = this.get(actionId, canvasMessageId);
+				const packet = this.getPacket(actionId, canvasMessageId);
 				if (packet) result.push(packet);
 			}
 		}

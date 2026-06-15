@@ -4,7 +4,7 @@ import { createRoom } from 'controllers/roomOperations/createRoom.controller';
 import { joinRoom } from 'controllers/roomOperations/joinRoom.controller';
 import { Router } from 'express';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
-import { getRooms } from 'wip/getRooms';
+import { getRooms } from 'controllers/roomOperations/getRooms';
 
 const router = (tokenBlacklist: TokenBlacklist) => {
 	const router = Router();

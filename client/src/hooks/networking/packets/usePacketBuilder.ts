@@ -27,6 +27,7 @@ interface BasePacketOptions {
 interface RoomPacketOptions extends BasePacketOptions {
 	/** Unique identifier for the room */
 	roomId: string;
+	userId: string;
 }
 
 /**
@@ -43,7 +44,8 @@ interface RoomPacketOptions extends BasePacketOptions {
  * createNewStrokeMetaData() call corrupting another tool's in-flight sequence numbers.
  */
 export class RoomPacketBuilder {
-	private readonly roomId: string;
+	private roomId: string;
+	private userId: string;
 	readonly POINTS_PER_PACKET: number;
 
 	/** Unique ID for the current stroke, reset on every new stroke */
@@ -51,10 +53,11 @@ export class RoomPacketBuilder {
 	/** Increments with every packet emitted within a stroke, reset on new stroke */
 	private packetSequenceNumber: number = 1;
 	/** Increments with every new stroke, never reset */
-	private strokeSequenceNumber: number = 1;
+	private strokeSequenceNumber: number = 0;
 
 	constructor(options: RoomPacketOptions) {
-		this.roomId = options.roomId; // todo pass the actual roomId
+		this.roomId = options.roomId;
+		this.userId = options.userId;
 		this.POINTS_PER_PACKET = options.pointsPerPacket ?? 2;
 	}
 
@@ -97,7 +100,7 @@ export class RoomPacketBuilder {
 			strokeSequenceNumber: this.strokeSequenceNumber,
 			category: MessageCategory.DRAWING,
 			type,
-			authorId: 'anonymous',
+			authorId: this.userId,
 			status: MessageStatus.CREATED,
 			points,
 			timestamp: Date.now(),
@@ -183,7 +186,7 @@ export class RoomPacketBuilder {
 			isLastPacket: true as const,
 			status: MessageStatus.CREATED,
 			category: MessageCategory.DRAWING,
-			authorId: 'anonymous',
+			authorId: this.userId,
 			timestamp: Date.now(),
 			type,
 			points,
@@ -199,6 +202,6 @@ export class RoomPacketBuilder {
  */
 export class LocalPacketBuilder extends RoomPacketBuilder {
 	constructor(options: BasePacketOptions = {}) {
-		super({ ...options, roomId: 'local' });
+		super({ ...options, roomId: 'local', userId: 'local' });
 	}
 }

@@ -82,6 +82,7 @@ class RedisStreamManager {
 			];
 		});
 
+		// todo add data validation and remove these checks
 		if (!roomId) throw new Error('roomId is required for dedup');
 		if (!authorId) throw new Error('authorId is required');
 

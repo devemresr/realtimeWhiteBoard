@@ -1,5 +1,5 @@
-import { BoundingBox, DrawingPoint, EraserPoint } from '@/types';
-import logger from 'src/util/logger';
+import { BoundingBox, EraserPoint } from '@/types';
+import logger from 'src/util/loggerTest';
 
 /**
  * SpatialGrid
@@ -19,19 +19,37 @@ import logger from 'src/util/logger';
  *
  * A stroke can span multiple cells (when its bounding box crosses cell boundaries).
  * A packet belonging to a stroke is recorded in every cell the stroke's bbox touches.
+ *
+ * Resize behaviour
+ * ----------------
+ * GRID_COLS and GRID_ROWS are derived from canvas dimensions when the canvas
+ * resizes, call updateDimensions() which updates the cell layout and clears the
+ * grid. The caller (CanvasState) is responsible for reinserting all strokes
+ * after a resize using freshly converted absolute bboxes from BoundingBoxStore.
  */
 export class SpatialGrid {
 	private readonly GRID_SIZE: number;
-	private readonly GRID_COLS: number;
-	private readonly GRID_ROWS: number;
+	private GRID_COLS: number;
+	private GRID_ROWS: number;
 
 	/** cellId -> strokeId -> Set<canvasMessageId> */
 	private grid = new Map<number, Map<string, Set<string>>>();
-
 	constructor(canvasWidth: number, canvasHeight: number, gridSize = 100) {
 		this.GRID_SIZE = gridSize;
 		this.GRID_COLS = Math.ceil(canvasWidth / gridSize);
 		this.GRID_ROWS = Math.ceil(canvasHeight / gridSize);
+	}
+
+	// RESIZE
+	/**
+	 * Update cell layout to match new canvas dimensions and clear the grid.
+	 * Caller must reinsert all strokes after calling this the grid is empty
+	 * after this returns.
+	 */
+	updateDimensions(width: number, height: number) {
+		this.GRID_COLS = Math.ceil(width / this.GRID_SIZE);
+		this.GRID_ROWS = Math.ceil(height / this.GRID_SIZE);
+		this.grid.clear();
 	}
 
 	// PRIVATE HELPERS
@@ -56,12 +74,35 @@ export class SpatialGrid {
 	/**
 	 * Register a stroke packet in every cell touched by `bbox`.
 	 * Called whenever a packet's bounding box is first computed or updated.
+	 * bbox must be in absolute pixel coordinates.
 	 */
-	addPacket(strokeId: string, canvasMessageId: string, bbox: BoundingBox) {
+	insertIntoGrid(strokeId: string, canvasMessageId: string, bbox: BoundingBox) {
+		logger.debug(
+			{
+				strokeId,
+				canvasMessageId,
+				bbox,
+			},
+			'insertIntoGrid called',
+		);
 		const minCellX = Math.floor(bbox.minX / this.GRID_SIZE);
 		const maxCellX = Math.floor(bbox.maxX / this.GRID_SIZE);
 		const minCellY = Math.floor(bbox.minY / this.GRID_SIZE);
 		const maxCellY = Math.floor(bbox.maxY / this.GRID_SIZE);
+
+		logger.debug(
+			{
+				strokeId,
+				canvasMessageId,
+				gridRange: {
+					minCellX,
+					maxCellX,
+					minCellY,
+					maxCellY,
+				},
+			},
+			'Calculated grid cell range',
+		);
 
 		let hasOutOfBounds = false;
 
@@ -70,14 +111,23 @@ export class SpatialGrid {
 				if (!this.isInBounds(cx, cy)) {
 					hasOutOfBounds = true;
 					logger.warn(
-						'Stroke bounding box extends outside grid the cx < 0 || cx >= GRID_COLS || cy < 0 || cy >= GRID_ROWS',
-						cx < 0,
-						cx >= this.GRID_COLS,
-						cy < 0,
-						cy >= this.GRID_ROWS,
-						'cx and cy:',
-						cx,
-						cy,
+						{
+							strokeId,
+							canvasMessageId,
+							cx,
+							cy,
+							minCellX,
+							maxCellX,
+							minCellY,
+							maxCellY,
+							outOfBounds: {
+								left: cx < 0,
+								right: cx >= this.GRID_COLS,
+								top: cy < 0,
+								bottom: cy >= this.GRID_ROWS,
+							},
+						},
+						'Attempted to add packet to out-of-bounds grid cell',
 					);
 					continue;
 				}
@@ -85,12 +135,28 @@ export class SpatialGrid {
 				const cellId = cy * this.GRID_COLS + cx;
 
 				if (!this.grid.has(cellId)) {
+					logger.debug(
+						{
+							cellId,
+							cx,
+							cy,
+						},
+						'Creating new grid cell',
+					);
 					this.grid.set(cellId, new Map());
 				}
 
 				const cellActions = this.grid.get(cellId)!;
 
 				if (!cellActions.has(strokeId)) {
+					logger.debug(
+						{
+							cellId,
+							strokeId,
+						},
+						'Creating stroke entry in cell',
+					);
+
 					cellActions.set(strokeId, new Set());
 				}
 
@@ -100,7 +166,6 @@ export class SpatialGrid {
 
 		if (hasOutOfBounds) {
 			logger.warn(
-				'Stroke bounding box extends outside grid bounds',
 				{
 					strokeId,
 					canvasMessageId,
@@ -114,7 +179,7 @@ export class SpatialGrid {
 						},
 					},
 				},
-				JSON.stringify({ minCellX, maxCellX, minCellY, maxCellY }),
+				'Stroke bounding box extends outside grid bounds',
 			);
 		}
 	}
@@ -160,7 +225,7 @@ export class SpatialGrid {
 		});
 
 		const centerCell = this.coordToCell(point.x, point.y);
-		logger.debug('center Cell for the eraser: ', centerCell);
+		logger.debug({ centerCell }, 'center Cell for the eraser: ');
 
 		return Array.from(nearbyStrokeIds);
 	}
@@ -210,6 +275,65 @@ export class SpatialGrid {
 				);
 			});
 		});
+	}
+
+	// UTIL
+	// Returns a flat strokeId -> Set<canvasMessageId> map extracted from all cells.
+	// Used by CanvasState before a grid rebuild to preserve packet associations.
+	snapshotStrokePackets(): Map<string, Set<string>> {
+		const snapshot = new Map<string, Set<string>>();
+
+		this.grid.forEach((cellActions) => {
+			cellActions.forEach((packetIds, strokeId) => {
+				if (!snapshot.has(strokeId)) {
+					snapshot.set(strokeId, new Set());
+				}
+				packetIds.forEach((id) => snapshot.get(strokeId)!.add(id));
+			});
+		});
+
+		return snapshot;
+	}
+	/**
+	 * Clears the grid and reinserts all strokes using the provided absolute bboxes.
+	 * Called by CanvasState after a canvas resize with freshly converted coordinates.
+	 * strokePackets preserves the strokeId -> Set<canvasMessageId> associations
+	 * that would otherwise be lost when the grid is cleared.
+	 */
+	rebuild(
+		strokePackets: Map<string, Set<string>>,
+		getBBox: (strokeId: string) => BoundingBox | undefined,
+	) {
+		this.grid.clear();
+
+		strokePackets.forEach((packetIds, strokeId) => {
+			const absoluteBBox = getBBox(strokeId);
+			if (!absoluteBBox) return;
+			packetIds.forEach((canvasMessageId) => {
+				this.insertIntoGrid(strokeId, canvasMessageId, absoluteBBox);
+			});
+		});
+
+		const cells = Object.fromEntries(
+			Array.from(this.grid.entries()).map(([cellId, packets]) => [
+				cellId,
+				Array.from(packets),
+			]),
+		);
+
+		logger.debug(
+			{
+				totalCells: this.grid.size,
+				totalStrokes: strokePackets.size,
+				cells: Object.fromEntries(
+					Array.from(this.grid.entries()).map(([cellId, packets]) => [
+						cellId,
+						Array.from(packets),
+					]),
+				),
+			},
+			'AFTER grid rebuild',
+		);
 	}
 
 	// CLEANUP

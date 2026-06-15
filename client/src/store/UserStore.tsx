@@ -2,11 +2,12 @@ import { create } from 'zustand';
 import { UserActions, UserState } from './types';
 
 const initialState: UserState = {
-	id: '',
+	userId: '',
 	name: '',
 	username: '',
 	email: '',
-	avatar: '',
+	avatarUrl: '',
+	surname: '',
 };
 
 export const useUserStore = create<UserState & UserActions>((set, get) => ({

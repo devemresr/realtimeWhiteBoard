@@ -7,9 +7,10 @@ import { useUserStore } from 'src/store/UserStore';
 import { useModalStore } from 'src/store/ModalStore';
 import { useLogin, useRegister } from 'src/hooks/api/endpoints/useFormPosts';
 import { toast } from 'react-toastify';
+import logger from 'src/util/loggerTest';
 
 export default function AuthModal() {
-	const userStore = useUserStore();
+	const setUser = useUserStore((state) => state.setUser);
 	const [authType, setAuthType] = useState<AuthContentTypes>('signIn');
 	const { closeModal } = useModalStore();
 	const [authForm, setAuthForm] = useState({
@@ -38,18 +39,38 @@ export default function AuthModal() {
 	const login = useLogin();
 	const handleLogin = async () => {
 		try {
-			await login.mutateAsync({
-				email: authForm.email,
-				password: authForm.password,
-			});
-			// todo setuser to store properly set isloggedin true
-			userStore.setUser({
-				id: '',
-				name: '',
-				username: '',
-				email: authForm.email,
-				avatar: '',
-			});
+			await login.mutateAsync(
+				{
+					email: authForm.email,
+					password: authForm.password,
+				},
+				{
+					onSuccess: (data) => {
+						const {
+							name,
+							surname,
+							username,
+							avatarUrl,
+							email,
+							_id: userId,
+						} = data.user;
+						logger.debug({ data }, 'LOGIN');
+
+						setUser({
+							userId,
+							surname,
+							name,
+							username,
+							email,
+							avatarUrl,
+						});
+					},
+
+					onError: (error) => {
+						logger.error(error);
+					},
+				},
+			);
 			closeModal();
 			toast.success('Welcome back!');
 		} catch {
@@ -64,21 +85,40 @@ export default function AuthModal() {
 			return;
 		}
 		try {
-			await register.mutateAsync({
-				email: authForm.email,
-				password: authForm.password,
-				name: authForm.name,
-				surname: authForm.surname,
-				username: authForm.username,
-				avatar: authForm.avatar,
-			});
-			userStore.setUser({
-				id: 'user-id',
-				name: authForm.name,
-				username: authForm.username,
-				email: authForm.email,
-				avatar: authForm.avatar,
-			});
+			await register.mutateAsync(
+				{
+					email: authForm.email,
+					password: authForm.password,
+					name: authForm.name,
+					surname: authForm.surname,
+					username: authForm.username,
+					avatarUrl: authForm.avatar,
+				},
+				{
+					onSuccess: (data) => {
+						const {
+							name,
+							surname,
+							username,
+							avatarUrl,
+							email,
+							_id: userId,
+						} = data.user;
+
+						setUser({
+							userId,
+							surname,
+							name,
+							username,
+							email,
+							avatarUrl,
+						});
+					},
+					onError: (error) => {
+						logger.error(error);
+					},
+				},
+			);
 			closeModal();
 			toast.success('Account created successfully!');
 		} catch {

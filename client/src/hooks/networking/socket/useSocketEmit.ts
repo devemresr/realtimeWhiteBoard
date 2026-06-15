@@ -24,7 +24,7 @@ export function useSocketEmit(socket: Socket | null) {
 			data: any,
 			options: EmitOptions = {},
 		): Promise<EmitResult> => {
-			const { timeout = 5000, maxRetries = 3 } = options;
+			const { timeout = 2000, maxRetries = 2 } = options;
 
 			if (!socket?.connected) {
 				return {
@@ -61,9 +61,9 @@ export function useSocketEmit(socket: Socket | null) {
 							error: error as Error,
 						};
 					}
-					// Exponential backoff: 200ms, 400ms, 1600ms
+					// Exponential backoff: 800ms, 1600ms
 					await new Promise((resolve) =>
-						setTimeout(resolve, 200 * Math.pow(2, attempt)),
+						setTimeout(resolve, 200 * Math.pow(4, attempt)),
 					);
 				}
 			}

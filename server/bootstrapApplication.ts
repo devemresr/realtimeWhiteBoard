@@ -9,6 +9,7 @@ import { AdapterManager } from 'controllers/socket/adapterManager';
 import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 import allowedOrigins from 'config/allowedOrigins';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
+import mongoose from 'mongoose';
 
 export async function bootstrapApplication(
 	serverReference: HttpServer,
@@ -38,12 +39,10 @@ export async function bootstrapApplication(
 				allowedHeaders: ['Content-Type'],
 				credentials: true,
 			},
-			// transports:
-			// 	process.env.NODE_ENV === 'loadTest'
-			// 		? ['websocket']
-			// 		: ['polling', 'websocket'],
-			transports: ['polling', 'websocket'],
-			// upgradeTimeout: 100, // upgrade to websocket almost immediately
+			transports:
+				process.env.NODE_ENV === 'loadTest'
+					? ['websocket']
+					: ['polling', 'websocket'],
 			allowEIO3: true,
 		});
 		console.log('Socket.IO initialized');

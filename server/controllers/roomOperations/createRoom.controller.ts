@@ -20,6 +20,22 @@ export const createRoom = async (req: Request, res: Response) => {
 		log.info({ userId }, 'Create room request received');
 		log.child({ userId });
 
+		const {
+			name = 'Untitled Room',
+			description = '',
+			maxMembers = null,
+			isLocked = false,
+			code = null,
+			passwordHash = null,
+		} = req.body as {
+			name?: string;
+			description?: string;
+			maxMembers?: number | null;
+			isLocked?: boolean;
+			code?: string | null;
+			passwordHash?: string | null;
+		};
+
 		const redis = RedisFactory.getInstance(RedisClients.MAIN).getRawClient();
 
 		// enforce room limit check cache first, fall back to DB
@@ -92,19 +108,17 @@ export const createRoom = async (req: Request, res: Response) => {
 		const roomId = nanoid(6);
 		log.child({ roomId });
 
-		await redis.hset(CACHE_KEYS.ROOM_ROLES(roomId), userId, Role.ADMIN);
-
-		log.debug(
-			{
-				cacheKey: CACHE_KEYS.ROOM_ROLES(roomId),
-			},
-			'Initialized room connected members hash',
-		);
-
 		// write to DB first source of truth
 		const room = await Room.create({
 			roomId,
 			createdBy: userId,
+			name,
+			description,
+			maxMembers,
+			isLocked,
+			code,
+			passwordHash,
+			roomStatus: isLocked ? 'LOCKED' : 'ACTIVE',
 		}).then((doc) => {
 			const { __v, createdAt, updatedAt, banned, ...room } =
 				doc.toObject() as TimestampedRoom & {
@@ -120,35 +134,36 @@ export const createRoom = async (req: Request, res: Response) => {
 			'Created room metadata document',
 		);
 
-		// prime the cache
-		await redis.hset(CACHE_KEYS.ROOM_DATA(roomId), {
-			room,
-		});
+		const createRoomPipeline = redis.pipeline();
 
-		log.debug(
-			{
-				cacheKey: CACHE_KEYS.ROOM_DATA(roomId),
-			},
-			'Primed room metadata cache',
-		);
+		createRoomPipeline.hset(CACHE_KEYS.ROOM_ROLES(roomId), userId, Role.ADMIN);
 
-		await redis.expire(
+		createRoomPipeline.hset(CACHE_KEYS.ROOM_DATA(roomId), room);
+
+		createRoomPipeline.expire(
 			CACHE_KEYS.ROOM_DATA(roomId),
 			CACHE_KEYS_TTL.ROOM_ACTIVE,
 		);
 
-		log.debug(
-			{
-				ttl: CACHE_KEYS_TTL.ROOM_ACTIVE,
-			},
-			'Applied room metadata TTL',
+		createRoomPipeline.expire(
+			CACHE_KEYS.ROOM_ROLES(roomId),
+			CACHE_KEYS_TTL.ROOM_ACTIVE,
 		);
 
-		await redis.zadd(CACHE_KEYS.ACTIVE_ROOMS, Date.now(), roomId);
+		createRoomPipeline.zadd(CACHE_KEYS.ACTIVE_ROOMS, Date.now(), roomId);
+
+		const createRoomResults = await createRoomPipeline.exec();
+
+		if (!createRoomResults) throw new Error('Redis pipeline returned null');
+
+		for (const [err] of createRoomResults) {
+			if (err) throw err;
+		}
 
 		return res.status(201).json({
 			roomId,
 			success: true,
+			room,
 		});
 	} catch (error) {
 		log.error({ err: error }, 'Unexpected error at createRoom controller');

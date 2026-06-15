@@ -14,11 +14,12 @@ export type ModalActions = {
 };
 
 export type UserState = {
-	id: string;
+	userId: string;
 	name: string;
 	username: string;
+	surname: string;
 	email: string;
-	avatar: string;
+	avatarUrl: string;
 };
 export type UserActions = {
 	setUser: (user: Partial<UserState>) => void;

@@ -1,6 +1,7 @@
 import {
 	BoundingBox,
 	CanvasOperation,
+	CanvasOperationType,
 	DrawingOperation,
 	DrawingPoint,
 	EraserPoint,
@@ -11,6 +12,12 @@ import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
 import { PacketStore } from './PacketStore';
 import { SpatialGrid } from './SpatialGrid';
+import logger from 'src/util/loggerTest';
+import {
+	pointsToAbsolute,
+	pointsToRelative,
+	toAbsolute,
+} from './CanvasState.helpers';
 
 export type StoreStrokeInterpolatedPointsFn = (
 	strokeId: string,
@@ -51,19 +58,23 @@ class CanvasState {
 	private readonly erasureStore: ErasureStore;
 	private readonly boundingBoxStore: BoundingBoxStore;
 	private readonly packetStore: PacketStore;
+	public canvasWidth: number;
+	public canvasHeight: number;
 
 	constructor(options: CanvasStateOptions) {
+		this.canvasHeight = options.canvasHeight;
+		this.canvasWidth = options.canvasWidth;
 		this.spatialGrid = new SpatialGrid(
-			options.canvasWidth,
-			options.canvasHeight,
+			this.canvasWidth,
+			this.canvasHeight,
 			options.gridSize,
 		);
 
 		this.erasureStore = new ErasureStore();
 
 		this.boundingBoxStore = new BoundingBoxStore(
-			options.canvasWidth,
-			options.canvasHeight,
+			this.canvasWidth,
+			this.canvasHeight,
 			this.spatialGrid,
 		);
 
@@ -72,10 +83,73 @@ class CanvasState {
 			this.erasureStore,
 		);
 	}
+	updateDimensions(width: number, height: number) {
+		// Snapshot packet associations before the grid is cleared.
+		this.canvasWidth = width;
+		this.canvasHeight = height;
+		const strokePackets = this.spatialGrid.snapshotStrokePackets();
+		logger.debug(
+			{
+				strokePackets: Array.from(strokePackets.entries()).map(
+					([strokeId, packetIds]) => ({
+						strokeId,
+						packetIds: Array.from(packetIds),
+					}),
+				),
+			},
+			'SNAPSHOTTED packets before grid rebuild',
+		);
+
+		// Both stores accept the new dimensions. BoundingBoxStore only updates its
+		// canvasWidth/Height - stored entries are untouched. SpatialGrid recomputes
+		// GRID_COLS/ROWS and clears the grid.
+		this.boundingBoxStore.updateDimensions(width, height);
+		this.spatialGrid.updateDimensions(width, height);
+
+		// Reinsert using bboxes scaled to the new dimensions. get() performs a
+		// single scale from each entry's captured origin size - no round-trip drift.
+		this.spatialGrid.rebuild(strokePackets, (strokeId) =>
+			this.boundingBoxStore.get(strokeId),
+		);
+	}
+
+	// HELPERS
+	private toRelativePacket(packet: CanvasOperation): CanvasOperation {
+		logger.debug({ packet, points: packet.points }, 'inside torelativePacket');
+		return {
+			...packet,
+			points:
+				packet.points.length !== 0
+					? pointsToRelative(packet.points, this.canvasWidth, this.canvasHeight)
+					: [],
+		};
+	}
+
+	private toAbsolutePacket(packet: CanvasOperation): CanvasOperation {
+		logger.debug({ packet, points: packet.points }, 'inside toabsolutePacket');
+		return {
+			...packet,
+			points:
+				packet.points.length !== 0
+					? pointsToAbsolute(packet.points, this.canvasWidth, this.canvasHeight)
+					: [],
+		};
+	}
 
 	// PACKET STORAGE
 	storePacket(packet: CanvasOperation) {
-		this.packetStore.store(packet);
+		logger.debug({ packet }, 'storing packet');
+
+		// bbox update always uses absolute points — must happen before conversion
+		if (packet.type === CanvasOperationType.DRAWING) {
+			this.boundingBoxStore.update(
+				packet.strokeId,
+				packet.canvasMessageId,
+				packet.points, // still absolute here
+			);
+		}
+
+		this.packetStore.storePacket(this.toRelativePacket(packet));
 	}
 
 	updatePacketStatus(
@@ -83,7 +157,11 @@ class CanvasState {
 		canvasMessageId: string,
 		status: MessageStatus,
 	): boolean {
-		return this.packetStore.updateStatus(actionId, canvasMessageId, status);
+		return this.packetStore.updatePacketStatus(
+			actionId,
+			canvasMessageId,
+			status,
+		);
 	}
 
 	// INTERPOLATED POINTS (strokes only)
@@ -105,14 +183,6 @@ class CanvasState {
 	// SPATIAL GRID (strokes only)
 	getPacketIdsNearPoint(point: EraserPoint): Map<string, Set<string>> {
 		return this.spatialGrid.getPacketIdsNearPoint(point);
-	}
-
-	addPacketToGrid(
-		strokeId: string,
-		canvasMessageId: string,
-		bbox: BoundingBox,
-	) {
-		this.spatialGrid.addPacket(strokeId, canvasMessageId, bbox);
 	}
 
 	pointToGridCell(x: number, y: number): number {
@@ -149,15 +219,15 @@ class CanvasState {
 		actionId: string,
 		canvasMessageId: string,
 	): CanvasOperation | undefined {
-		return this.packetStore.get(actionId, canvasMessageId);
+		const packet = this.packetStore.getPacket(actionId, canvasMessageId);
+		if (!packet) return undefined;
+		return this.toAbsolutePacket(packet);
 	}
 
 	getPreviousPacket(packet: CanvasOperation): CanvasOperation | undefined {
-		return this.packetStore.getPrevious(packet);
-	}
-
-	getPoints(actionId: string, canvasMessageId: string) {
-		return this.packetStore.getPoints(actionId, canvasMessageId);
+		const prev = this.packetStore.getPreviousPacket(packet);
+		if (!prev) return undefined;
+		return this.toAbsolutePacket(prev);
 	}
 
 	getPacketsToSendForAction(actionId: string): CanvasOperation[] {
@@ -177,7 +247,9 @@ class CanvasState {
 	}
 
 	getAllNonErasedDrawingPackets(): DrawingOperation[] {
-		return this.packetStore.getAllNonErasedDrawingPackets();
+		return this.packetStore
+			.getAllNonErasedDrawingPackets()
+			.map((packet) => this.toAbsolutePacket(packet) as DrawingOperation);
 	}
 
 	getAllPacketsToSend(): CanvasOperation[] {
@@ -239,6 +311,6 @@ class CanvasState {
 }
 
 export const canvasState = new CanvasState({
-	canvasWidth: 1800,
-	canvasHeight: 1000,
+	canvasWidth: 0, // will be set correctly on mount
+	canvasHeight: 0,
 });

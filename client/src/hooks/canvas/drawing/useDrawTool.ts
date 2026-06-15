@@ -1,11 +1,17 @@
-import { useCallback, useRef, useState } from 'react';
-import { RoomPacketBuilder } from '../../networking/packets/usePacketBuilder';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
+import {
+	LocalPacketBuilder,
+	RoomPacketBuilder,
+} from '../../networking/packets/usePacketBuilder';
 
 import { DrawingOperation, DrawingPoint, CanvasOperationType } from '@/types';
 import { ToolInstance } from 'src/types/tool.types';
 import { DrawDotOnCanvasFn, DrawIncrementalPathFn } from './useCanvasDrawing';
 import { HandlePacketSendingFn } from '../../networking/packets/usePacketTransmitter';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
+import { useUserStore } from 'src/store/UserStore';
+import { useRoomStatusStore } from 'src/store/RoomStore';
+import logger from 'src/util/loggerTest';
 
 interface UseDrawToolProps {
 	brushColor: string;
@@ -24,9 +30,22 @@ export const useDrawTool = ({
 }: UseDrawToolProps): ToolInstance => {
 	const [isDrawing, setIsDrawing] = useState(false);
 	const strokePointsRef = useRef<DrawingPoint[]>([]);
-	// todo pass the roomId from the zustand store
-	const builderRef = useRef(new RoomPacketBuilder({ roomId: 'room2' }));
-	const roomPacketBuilder = builderRef.current;
+	const roomId = useRoomStatusStore((state) => state.roomId);
+	const userId = useUserStore((state) => state.userId);
+
+	const roomPacketBuilderRef = useRef<RoomPacketBuilder | null>(
+		new LocalPacketBuilder(),
+	);
+
+	useEffect(() => {
+		if (!roomId || !userId) {
+			logger.debug({ roomId, userId }, 'local session');
+			roomPacketBuilderRef.current = new LocalPacketBuilder();
+			return;
+		}
+		logger.debug({ roomId, userId }, 'room session');
+		roomPacketBuilderRef.current = new RoomPacketBuilder({ roomId, userId });
+	}, [roomId, userId]);
 
 	const startInteraction = useCallback(
 		(e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -43,10 +62,11 @@ export const useDrawTool = ({
 
 			strokePointsRef.current = [pos];
 			setIsDrawing(true);
-			roomPacketBuilder.createNewStrokeMetaData();
-			const { packets, remainingPoints } = roomPacketBuilder.buildStrokePackets(
-				strokePointsRef.current,
-			);
+			roomPacketBuilderRef.current.createNewStrokeMetaData();
+			const { packets, remainingPoints } =
+				roomPacketBuilderRef.current.buildStrokePackets(
+					strokePointsRef.current,
+				);
 
 			// storePacket is idompotent packets here is likely empty but it gets handled when endInteraction gets called
 			packets.forEach((packet) => {
@@ -56,7 +76,7 @@ export const useDrawTool = ({
 
 			drawDotOnCanvas(pos, CanvasOperationType.DRAWING);
 		},
-		[brushSize, brushColor, roomPacketBuilder, drawDotOnCanvas],
+		[brushSize, brushColor, drawDotOnCanvas],
 	);
 
 	const continueInteraction = useCallback(
@@ -90,9 +110,10 @@ export const useDrawTool = ({
 			);
 
 			// Create packets from current points
-			const { packets, remainingPoints } = roomPacketBuilder.buildStrokePackets(
-				strokePointsRef.current,
-			);
+			const { packets, remainingPoints } =
+				roomPacketBuilderRef.current.buildStrokePackets(
+					strokePointsRef.current,
+				);
 
 			// Update the ref to only keep remaining points
 			strokePointsRef.current = remainingPoints;
@@ -123,7 +144,6 @@ export const useDrawTool = ({
 			isDrawing,
 			brushSize,
 			brushColor,
-			roomPacketBuilder,
 			handlePacketSending,
 			drawIncrementalPath,
 		],
@@ -132,7 +152,7 @@ export const useDrawTool = ({
 	const endInteraction = useCallback(() => {
 		if (!isDrawing) return;
 
-		const packet = roomPacketBuilder.buildFinalPacket(
+		const packet = roomPacketBuilderRef.current.buildFinalPacket(
 			strokePointsRef.current,
 			CanvasOperationType.DRAWING,
 		);
@@ -155,7 +175,7 @@ export const useDrawTool = ({
 
 		setIsDrawing(false);
 		strokePointsRef.current = [];
-	}, [isDrawing, roomPacketBuilder, handlePacketSending]);
+	}, [isDrawing, handlePacketSending]);
 
 	return {
 		startInteraction,

@@ -21,7 +21,7 @@ export const issueAuthResponse = (user: PublicUser, res: Response) => {
 
 		const accessToken = generateAccessToken(userId, email);
 		setRefreshTokenCookie(userId, email, res);
-		return res.status(200).json({ accessToken });
+		return res.status(200).json({ accessToken, user });
 	} catch (error) {
 		// TODO: Replace this with a dedicated authError type
 		return res.status(500).json({ message: 'Authentication response failed' });

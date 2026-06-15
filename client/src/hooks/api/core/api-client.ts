@@ -10,7 +10,6 @@ type ApiFetchOptions = {
 	method?: HttpMethod;
 	body?: unknown;
 	params?: Record<string, unknown>;
-	requiresAuth?: boolean;
 	serverUrl?: string;
 };
 

@@ -17,10 +17,11 @@ import { usePathname, useRouter } from 'next/navigation';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const modalStore = useModalStore();
-	const { resetUser, id } = useUserStore();
+	const userId = useUserStore((state) => state.userId);
+	const resetUser = useUserStore((state) => state.resetUser);
 	const router = useRouter();
 	const pathname = usePathname();
-	const loggedIn = !!id;
+	const loggedIn = !!userId;
 	const color = '#2f2f2f';
 	const authenticatedMenuConfig = loggedIn
 		? [
@@ -30,7 +31,6 @@ export default function Menu() {
 					title: 'Log Out',
 					subtitle: '',
 					trigger: () => {
-						console.log('id:', id);
 						resetUser();
 					},
 				},
@@ -49,7 +49,6 @@ export default function Menu() {
 					title: 'Sign In',
 					subtitle: '',
 					trigger: () => {
-						console.log('id:', id);
 						modalStore.openModal({ extra: <AuthModal /> });
 					},
 				},

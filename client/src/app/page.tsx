@@ -9,6 +9,10 @@ import {
 const Canvas = lazy(() => import('../components/canvas'));
 import { Socket } from 'socket.io-client';
 import { SOCKET_CONFIG } from 'src/constants/socket.config';
+import { useCreateRoom } from 'src/hooks/api/endpoints/useFormPosts';
+import logger from 'src/util/loggerTest';
+import { useRoomStatusStore } from 'src/store/RoomStore';
+import { useUserStore } from 'src/store/UserStore';
 const whiteBoardApp = () => {
 	const [socket, setSocket] = useState<Socket | null>(null);
 	const [connected, setConnected] = useState(false);
@@ -23,28 +27,46 @@ const whiteBoardApp = () => {
 		connectedRef.current = connected;
 	}, [connected]);
 
+	const createRoom = useCreateRoom();
+	const setRoom = useRoomStatusStore((state) => state.setRoom);
+	const roomId = useRoomStatusStore((state) => state.roomId);
+	const userId = useUserStore((state) => state.userId);
+
 	useEffect(() => {
+		if (userId === '') {
+			logger.debug(
+				{ userId },
+				'session: userId caused a call but it doesnt exist yet',
+			);
+		}
+
 		const newSocket = io(
 			process.env.NEXT_PUBLIC_GATEWAY_URL!,
 
 			{
 				...SOCKET_CONFIG,
 				// todo change localstorage to zustand
-				// auth: { token: localStorage.getItem('accessToken') },
+				auth: { token: localStorage.getItem('accessToken') },
 			},
 		);
 
 		setSocket(newSocket); // safe for children components
 
-		const handleConnect = () => {
+		const handleConnect = async () => {
 			console.log('Connected with socket ID:', newSocket.id);
 			setConnected(true);
 			setSocketId(newSocket.id);
 			setError('connection error solved connected');
 
-			// todo change it to emit actual roomId
-			newSocket.emit(CLIENT_EVENTS.JOIN_ROOM, { roomId: 'test' }, (ack) => {
+			const data = await createRoom.mutateAsync({});
+
+			const { roomId } = data;
+
+			newSocket.emit(CLIENT_EVENTS.JOIN_ROOM, { roomId }, (ack) => {
 				console.log('Join room ack:', ack);
+				setRoom({
+					roomId,
+				});
 			});
 		};
 
@@ -96,15 +118,7 @@ const whiteBoardApp = () => {
 			newSocket.close(); // automatically removes listeners
 			setSocket(null); // ensure children know socket is gone
 		};
-	}, []);
-
-	// useEffect(() => {
-	// 	console.log(' token effect fired, token:', token, 'socket:', !!socket);
-	// 	if (!socket || !token) return;
-	// 	// just update auth on existing socket, don't recreate
-	// 	socket.auth = { token };
-	// 	socket.disconnect().connect(); // reconnect with new token
-	// }, [token]); // token changes only trigger re-auth
+	}, [userId]);
 
 	return <>{socket && <Canvas socket={socket} />}</>;
 };

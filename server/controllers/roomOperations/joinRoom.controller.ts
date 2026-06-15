@@ -17,9 +17,16 @@ export const joinRoom = async (req: Request, res: Response) => {
 	try {
 		const userId = requireUserId(req);
 
-		const { roomId, role: reqRole } = req.body as {
+		const {
+			roomId,
+			role: reqRole,
+			password,
+			code,
+		} = req.body as {
 			roomId: string;
 			role?: 'participant' | 'spectator';
+			password?: string;
+			code?: string;
 		};
 
 		log.info({ roomId, requestedRole: reqRole }, 'joinRoom request received');
@@ -112,16 +119,39 @@ export const joinRoom = async (req: Request, res: Response) => {
 		}
 
 		// register member presence and mark room active
-		await redis
+		const results = await redis
 			.pipeline()
 			.hset(CACHE_KEYS.ROOM_ROLES(roomId), userId, role)
 			.zadd(CACHE_KEYS.ACTIVE_ROOMS, Date.now(), roomId)
+			.hlen(CACHE_KEYS.ROOM_ROLES(roomId))
 			.exec();
+		if (!results) throw new Error('Redis pipeline returned null');
+
+		const [err, memberCount] = results[2] as [Error | null, number];
+
+		if (err) throw err;
+
+		const maxMembers = Number(roomMeta?.maxMembers ?? 0);
+
+		if (maxMembers > 0 && memberCount >= maxMembers && !roomRole) {
+			res.status(403).json({ error: 'Room is full' });
+			return;
+		}
+
+		if (roomMeta?.password && password && roomMeta.password !== password) {
+			res.status(403).json({ error: 'Invalid room password' });
+			return;
+		}
+
+		if (roomMeta?.code && code && roomMeta.code !== code) {
+			res.status(403).json({ error: 'Invalid room code' });
+			return;
+		}
 
 		log.info('joinRoom successful, handing off to socket handler');
 		return res
 			.status(201)
-			.json({ roomId, role, status: roomStatus, success: true });
+			.json({ roomId, role, status: roomStatus, success: true, memberCount });
 	} catch (error) {
 		log.error({ err: error }, 'Unexpected error at joinRoom controller');
 		return res.status(500).json({
