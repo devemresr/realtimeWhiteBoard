@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import CustomInput from './customInput';
 import CustomPagination from './customPagination';
 import { FaRegUser } from 'react-icons/fa';
+import { FaCircle } from 'react-icons/fa';
 import { useGetRooms } from 'src/hooks/api/endpoints/useFormPosts';
 import logger from 'src/util/loggerTest';
 
 export default function JoinRoom() {
-	const [roomForm, setRoomForm] = useState({ code: '', password: '' });
+	const [roomForm, setRoomForm] = useState({ roomId: '', password: '' });
 	const [listPasswords, setListPasswords] = useState<Record<string, string>>(
 		{},
 	);
@@ -16,24 +17,24 @@ export default function JoinRoom() {
 
 	useEffect(() => {
 		const timer = setTimeout(() => {
-			if (!roomForm.code) {
+			if (!roomForm.roomId) {
 				setFoundRoom(null);
 				setShowPassword(false);
 				return;
 			}
-			const room = dummyRooms.find(
-				(r) => r.code.toLowerCase() === roomForm.code.toLowerCase(),
+			const room = data?.rooms.find(
+				// todo is this the correct data, is it returning all the rooms private included if not should be changed
+				(r) => r.roomId.toLowerCase() === roomForm.roomId.toLowerCase(),
 			);
 			setFoundRoom(room || null);
 			setShowPassword(!!room?.password?.length);
 		}, 700);
 		return () => clearTimeout(timer);
-	}, [roomForm.code]);
+	}, [roomForm.roomId]);
 	const dummyRooms = [
 		{
-			id: 'room001',
 			name: 'Frontend Study Group',
-			code: 'FRONT123',
+			roomId: 'FRONT123',
 			private: false,
 			password: '',
 			owner: {
@@ -49,9 +50,8 @@ export default function JoinRoom() {
 			memberCount: 12,
 		},
 		{
-			id: 'room002',
 			name: 'Algorithms Workshop',
-			code: 'ALG456',
+			roomId: 'ALG456',
 			private: true,
 			password: 'algo2026',
 			owner: {
@@ -67,9 +67,8 @@ export default function JoinRoom() {
 			memberCount: 8,
 		},
 		{
-			id: 'room003',
 			name: 'UI Design Review',
-			code: 'DESIGN88',
+			roomId: 'DESIGN88',
 			private: true,
 			password: '',
 			owner: {
@@ -85,9 +84,8 @@ export default function JoinRoom() {
 			memberCount: 15,
 		},
 		{
-			id: 'room004',
 			name: 'Project Team Alpha',
-			code: 'ALPHA42',
+			roomId: 'ALPHA42',
 			private: false,
 			password: 'teamalpha',
 			owner: {
@@ -103,9 +101,8 @@ export default function JoinRoom() {
 			memberCount: 5,
 		},
 		{
-			id: 'room005',
 			name: 'Photography Challenge',
-			code: 'PHOTO99',
+			roomId: 'PHOTO99',
 			private: false,
 			password: '',
 			owner: {
@@ -121,9 +118,8 @@ export default function JoinRoom() {
 			memberCount: 24,
 		},
 		{
-			id: 'room006',
 			name: 'Exam Preparation',
-			code: 'EXAM2026',
+			roomId: 'EXAM2026',
 			private: true,
 			password: 'studyhard',
 			owner: {
@@ -139,9 +135,8 @@ export default function JoinRoom() {
 			memberCount: 18,
 		},
 		{
-			id: 'room007',
 			name: 'React Native Help',
-			code: 'RNHELP',
+			roomId: 'RNHELP',
 			private: false,
 			password: '',
 			owner: {
@@ -157,9 +152,8 @@ export default function JoinRoom() {
 			memberCount: 31,
 		},
 		{
-			id: 'room008',
 			name: 'Secret Project',
-			code: 'SECRETX',
+			roomId: 'SECRETX',
 			private: false,
 			password: 'classified',
 			owner: {
@@ -211,21 +205,22 @@ export default function JoinRoom() {
 	const publicRooms = data?.rooms ?? [];
 	const [paginationPageNumber, setPaginationPageNumber] = useState(1);
 	const [selectedRoomCode, setSelectedRoomCode] = useState<string | null>(null);
-	const itemsPerPage = 5;
+	const itemsPerPage = 3;
 	const lastIndex = paginationPageNumber * itemsPerPage;
 	const firstIndex = lastIndex - itemsPerPage;
 	const paginatedRooms = publicRooms.slice(firstIndex, lastIndex);
 	const pageAmount = Math.ceil(publicRooms.length / itemsPerPage);
+	console.log('fatma', data);
 	return (
-		<div>
+		<div className='max-w-96'>
 			<div className='flex flex-col gap-2'>
 				<div className='flex flex-row gap-2 pt-2'>
 					<CustomInput
 						area='code'
-						title='code'
+						title='Enter code'
 						placeholder='Room Code'
 						onChange={handleRoomFormChange}
-						value={roomForm.code}
+						value={roomForm.roomId}
 						className='w-full'
 					/>
 					<button
@@ -252,15 +247,21 @@ export default function JoinRoom() {
 
 			<div className='flex flex-col gap-4 pt-2 overflow-hidden'>
 				{paginatedRooms.map((room) => {
-					const isSelected = selectedRoomCode === room.code;
+					const isSelected = selectedRoomCode === room.roomId;
 					return (
 						<div
 							key={room.roomId}
 							className='border border-gray-300 rounded-lg p-4 hover:shadow-md transition-shadow duration-300 ease-in-out'
-							onClick={() => handleSelectRoom(room.code)}
+							onClick={() => handleSelectRoom(room.roomId)}
 						>
 							<span className='flex justify-between items-center'>
-								<h3>{room.name}</h3>
+								<div className='flex items-center gap-1'>
+									<FaCircle
+										size={10}
+										color={room.roomStatus === 'ACTIVE' ? 'green' : 'red'}
+									/>
+									<h3>{room.name}</h3>
+								</div>
 								<div className='flex items-baseline gap-1'>
 									<FaRegUser
 										style={{ position: 'relative', top: 1 }}
@@ -272,7 +273,16 @@ export default function JoinRoom() {
 							</span>
 
 							{isSelected && (
-								<p className='text-gray-500 text-left text-sm'>{room.code}</p>
+								<>
+									<p className='text-gray-500 text-left text-sm'>
+										{room.roomId}
+									</p>
+									{room.description && (
+										<p className='text-gray-600 text-left text-sm '>
+											{room.description}
+										</p>
+									)}
+								</>
 							)}
 
 							<div

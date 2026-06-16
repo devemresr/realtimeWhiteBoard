@@ -1,11 +1,10 @@
-export default function CustomInput({
+export default function CustomTextArea({
 	title,
 	isInvalid,
 	area,
 	placeholder,
 	onChange,
 	value,
-	validationMessage,
 	className,
 	props,
 }: {
@@ -13,11 +12,10 @@ export default function CustomInput({
 	isInvalid?: boolean;
 	area: string;
 	placeholder: string;
-	onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+	onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
 	value: string;
-	validationMessage?: string;
 	className?: string;
-	props?: React.InputHTMLAttributes<HTMLInputElement>;
+	props?: React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 }) {
 	return (
 		<div className={className}>
@@ -25,22 +23,20 @@ export default function CustomInput({
 			<div
 				className={`w-full border rounded-lg p-1.5 flex flex-row items-center ${isInvalid ? 'border-red-500' : 'border-gray-300'} border-gray-300 focus-within:border-purple-500 transition-colors shadow-sm`}
 			>
-				<input
+				<textarea
 					className='w-full outline-none'
-					type={area === 'password' ? 'password' : 'text'}
 					name={area}
 					placeholder={placeholder}
-					autoComplete='off'
 					onChange={onChange}
 					value={value}
 					{...props}
 				/>
 			</div>
-			<p
-				className={`text-red-500 text-sm max-w-[390px] transition-all duration-300 ease-in-out ${isInvalid ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}
-			>
-				{isInvalid && validationMessage && validationMessage}
-			</p>
+			{props?.maxLength && (
+				<p className='text-gray-400 text-xs text-right'>
+					{value.length}/{props.maxLength}
+				</p>
+			)}
 		</div>
 	);
 }

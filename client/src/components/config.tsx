@@ -85,11 +85,6 @@ export const canvasBarItems: CanvasBarItem[] = [
 		cursor: 'cursor-text',
 	},
 	{ key: 'line', icon: <LineSVG color={color} /> },
-	{
-		key: 'image',
-		icon: <ImageSVG color={color} />,
-		cursor: 'cursor-circle',
-	},
 	{ key: 'clear', icon: <TrashSVG color={color} /> },
 ];
 

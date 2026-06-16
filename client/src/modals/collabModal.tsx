@@ -7,20 +7,6 @@ import JoinRoom from 'src/components/joinRoom';
 export default function CollabModal() {
 	const [CollabMode, setCollabMode] = useState<'create' | 'join' | null>(null);
 	const { closeModal } = useModalStore();
-	const [roomForm, setRoomForm] = useState({
-		name: '',
-		code: '',
-		private: false,
-		password: '',
-	});
-
-	const handleRoomForm = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const { name, type, value, checked } = e.target;
-		setRoomForm((prev) => ({
-			...prev,
-			[name]: type === 'checkbox' ? checked : value,
-		}));
-	};
 
 	return (
 		<div>
@@ -71,11 +57,7 @@ export default function CollabModal() {
     ${CollabMode ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}
   `}
 			>
-				{CollabMode === 'create' ? (
-					<CreateRoom roomForm={roomForm} handleRoomForm={handleRoomForm} />
-				) : (
-					<JoinRoom />
-				)}
+				{CollabMode === 'create' ? <CreateRoom /> : <JoinRoom />}
 			</div>
 		</div>
 	);

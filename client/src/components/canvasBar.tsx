@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { canvasBarItems } from './config';
 import { useModalStore } from 'src/store/ModalStore';
+import HistoryArrows from './historyArrows';
 export default function CanvasBar({
 	setSelectedElement,
 	selectedElement,
@@ -29,18 +30,13 @@ export default function CanvasBar({
 						handlers[selectedKey]();
 					}
 				}
-				return;
-			} else if (key === '0') {
-				const lastIndex = items.length - 1;
-				if (items[lastIndex]) {
-					const selectedKey = items[lastIndex].key;
-					setSelectedElement(selectedKey);
-					handlers[selectedKey]();
+				if (key === '9') {
 					timeoutRef.current = setTimeout(() => {
 						setSelectedElement('pointer');
 						timeoutRef.current = null;
 					}, 250);
 				}
+				return;
 			}
 		};
 		window.addEventListener('keydown', handleKeyDown);
@@ -92,6 +88,7 @@ export default function CanvasBar({
 					</button>
 				);
 			})}
+			<HistoryArrows />
 			<button onClick={() => setIsLogging(!isLogging)}>
 				{isLogging ? 'press ESC to stop logging' : 'Start Logging'}
 			</button>
