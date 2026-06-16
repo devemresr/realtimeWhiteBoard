@@ -8,10 +8,34 @@ export default function CanvasBar({
 	clearCanvas,
 	isLogging,
 	setIsLogging,
+	canvasRef,
+	setTextEditor,
 }) {
 	const { visible } = useModalStore();
+
+	const placeText = () => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+
+		const handleClick = (e: MouseEvent) => {
+			const rect = canvas.getBoundingClientRect();
+
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
+
+			setTextEditor({
+				x,
+				y,
+				value: '',
+			});
+
+			canvas.removeEventListener('click', handleClick);
+		};
+
+		canvas.addEventListener('click', handleClick);
+	};
 	const items = canvasBarItems;
-	const handlers = { clear: clearCanvas };
+	const handlers = { clear: clearCanvas, text: placeText };
 	const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => {
 		if (visible) return; // prevent keydown events when modal is open

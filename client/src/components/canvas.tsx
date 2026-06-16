@@ -26,6 +26,7 @@ import AttendeeList from './attendeeList';
 import { canvasBarItems, cursors } from './config';
 import { useEraserManager } from 'src/hooks/canvas/drawing/useEraserManager';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
+import CanvasText from './canvasText';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -179,6 +180,11 @@ export default function Canvas({ socket }: ChildComponentProps) {
 			canvas.height > 0,
 		);
 	}, []);
+	const [textEditor, setTextEditor] = useState<{
+		x: number;
+		y: number;
+		value: string;
+	} | null>(null);
 	const startInteraction = (e: React.PointerEvent<HTMLCanvasElement>) => {
 		if (!canUseCanvas()) return;
 		const currentTool = tools[selectedElement];
@@ -197,6 +203,15 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const cursor = canvasBarItems.find(
 		(item) => item.key === selectedElement,
 	).cursor;
+	const test = () => {
+		const canvas = canvasRef.current;
+		const ctx = canvas.getContext('2d');
+
+		ctx.font = '18px Arial';
+		ctx.fillStyle = 'blue';
+
+		ctx.fillText('Hello, React!', 50, 100);
+	};
 	return (
 		<div
 			className='flex relative'
@@ -214,13 +229,23 @@ export default function Canvas({ socket }: ChildComponentProps) {
           }
         `}
 			</style>
-
+			<button onClick={test}>test</button>
+			<CanvasText
+				textEditor={textEditor}
+				setTextEditor={setTextEditor}
+				canvasRef={canvasRef}
+				brushColor={brushColor}
+				textStyle={textStyle}
+				setSelectedElement={setSelectedElement}
+			/>
 			<CanvasBar
 				setSelectedElement={setSelectedElement}
 				selectedElement={selectedElement}
 				clearCanvas={clearCanvas}
 				isLogging={isLogging}
 				setIsLogging={setIsLogging}
+				canvasRef={canvasRef}
+				setTextEditor={setTextEditor}
 			/>
 			<CanvasSideBar
 				selectedElement={selectedElement}

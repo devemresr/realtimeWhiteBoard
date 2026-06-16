@@ -44,9 +44,9 @@ export const brushShapeConfig = [
 	},
 ];
 export const textSizeConfig = [
-	{ key: 'smallT', iconSize: 10, fontSize: 14 },
-	{ key: 'mediumT', iconSize: 14, fontSize: 18 },
-	{ key: 'bigT', iconSize: 16, fontSize: 22 },
+	{ key: 'smallT', iconSize: 10, fontSize: '14px' },
+	{ key: 'mediumT', iconSize: 14, fontSize: '18px' },
+	{ key: 'bigT', iconSize: 16, fontSize: '22px' },
 ];
 
 export const textDesignConfig = [
