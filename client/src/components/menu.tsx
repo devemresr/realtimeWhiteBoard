@@ -17,7 +17,7 @@ import { usePathname, useRouter } from 'next/navigation';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const modalStore = useModalStore();
-	const { userId, username } = useUserStore();
+	const { userId } = useUserStore();
 	const resetUser = useUserStore((state) => state.resetUser);
 	const router = useRouter();
 	const pathname = usePathname();

@@ -203,15 +203,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const cursor = canvasBarItems.find(
 		(item) => item.key === selectedElement,
 	).cursor;
-	const test = () => {
-		const canvas = canvasRef.current;
-		const ctx = canvas.getContext('2d');
-
-		ctx.font = '18px Arial';
-		ctx.fillStyle = 'blue';
-
-		ctx.fillText('Hello, React!', 50, 100);
-	};
 	return (
 		<div
 			className='flex relative'
@@ -229,7 +220,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
           }
         `}
 			</style>
-			<button onClick={test}>test</button>
 			<CanvasText
 				textEditor={textEditor}
 				setTextEditor={setTextEditor}

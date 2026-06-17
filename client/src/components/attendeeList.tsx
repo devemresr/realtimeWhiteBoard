@@ -2,22 +2,13 @@ import { useEffect, useState } from 'react';
 import { FaCrown } from 'react-icons/fa';
 import { TbLogout } from 'react-icons/tb';
 import { PiUsersThree } from 'react-icons/pi';
+import { useUserStore } from 'src/store/UserStore';
+import { MdContentCopy } from 'react-icons/md';
 export default function AttendeeList() {
 	const [active, setActive] = useState(false);
-	const [online, setOnline] = useState(false); // only render if its collaborated on
-	useEffect(() => {
-		setOnline(true); // todo set online status based on real connection status
-	}, []);
-	const user = {
-		id: 'u001',
-		username: 'teacher_jane',
-		displayName: 'Jane Wilson',
-		email: 'jane.wilson@example.com',
-		avatar: 'https://i.pravatar.cc/150?img=1',
-		role: 'owner',
-		isOnline: true,
-		joinedAt: '2026-06-09T09:00:00Z',
-	};
+	const { userId } = useUserStore();
+	const loggedIn = !!userId;
+	const canvasCode = 'FA353Y';
 	const attendeeList = {
 		owner: {
 			id: 'u001',
@@ -99,8 +90,15 @@ export default function AttendeeList() {
 	const kickUser = (id) => {
 		// todo kick  user
 	};
-
-	return !online ? null : (
+	const handleCopy = async () => {
+		try {
+			await navigator.clipboard.writeText(canvasCode);
+			console.log('Copied!');
+		} catch (err) {
+			console.error('Failed to copy:', err);
+		}
+	};
+	return !loggedIn ? null : (
 		<>
 			<button
 				onClick={() => setActive(!active)}
@@ -113,6 +111,16 @@ export default function AttendeeList() {
 					style={{ width: 260, maxHeight: 600, minHeight: 200, zIndex: 1 }}
 					className='overflow-y-auto container fixed right-2 top-12 bg-white border rounded-lg border-gray-200 p-2 shadow flex flex-col gap-1'
 				>
+					<div className='flex gap-2'>
+						<h1 className='text-md text-gray-700'>{canvasCode}</h1>
+						<button
+							className='text-gray-600 hover:text-gray-800'
+							onClick={handleCopy}
+						>
+							<MdContentCopy />
+						</button>
+					</div>
+					<div className='w-full h-0.5 bg-gray-100' />
 					{Object.entries(attendeeList).map(([role, list]) => {
 						if (!Array.isArray(list)) {
 							return (
@@ -141,7 +149,7 @@ export default function AttendeeList() {
 									alt={attendee.displayName}
 								/>
 								<p className='w-full text-left'>{attendee.displayName}</p>
-								{user.id === attendeeList.owner.id && (
+								{userId === attendeeList.owner.id && (
 									<button onClick={() => kickUser(attendee.id)}>
 										<TbLogout
 											className='transition-colors text-gray-300 hover:text-black'
