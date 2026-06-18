@@ -70,7 +70,6 @@ export default function useApiQuery<
 		queryFn: async () => {
 			return apiFetch<TData>(config.url, config);
 		},
-		enabled: finalEnabled,
 
 		// React Query retry configuration
 		retry: (failureCount, error) => shouldRetry(failureCount, error),
@@ -78,6 +77,7 @@ export default function useApiQuery<
 
 		// Merge any additional query options
 		...config.queryOptions,
+		enabled: finalEnabled,
 	});
 }
 

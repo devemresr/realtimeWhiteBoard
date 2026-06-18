@@ -1,55 +1,6 @@
-// import mongoose, { Schema } from 'mongoose';
-// import { DocumentWithTimestamps } from './RoomMetadata';
-
-// export interface RoomData {
-// 	// identifiers
-// 	roomId: string;
-// 	createdBy: string;
-
-// 	// room states
-// 	roomStatus: 'ACTIVE' | 'LOCKED' | 'ARCHIVED';
-// 	banned: string[];
-// }
-// const RoomSchema = new Schema<RoomData>(
-// 	{
-// 		// identifiers
-// 		createdBy: { type: String, required: true },
-// 		roomId: { type: String, required: true },
-
-// 		// room states
-// 		roomStatus: {
-// 			type: String,
-// 			enum: ['ACTIVE', 'LOCKED', 'ARCHIVED'],
-// 			required: true,
-// 			default: 'ACTIVE',
-// 		},
-// 		banned: { type: [String], required: true, default: [] },
-// 	},
-// 	{ timestamps: true },
-// );
-
-// export default mongoose.model<RoomData>('Room', RoomSchema);
-// export type TimestampedRoom = DocumentWithTimestamps<RoomData>;
 import mongoose, { Schema } from 'mongoose';
 import { DocumentWithTimestamps } from './RoomMetadata';
-
-export interface RoomData {
-	// identifiers
-	roomId: string;
-	createdBy: string;
-
-	// metadata
-	name: string;
-	description?: string;
-
-	// room states
-	roomStatus: 'ACTIVE' | 'LOCKED' | 'ARCHIVED';
-	isLocked: boolean;
-	banned: string[];
-
-	// limits
-	maxMembers?: number;
-}
+import { RoomData, RoomStatus } from '@/types';
 
 const RoomSchema = new Schema<RoomData>(
 	{
@@ -81,18 +32,18 @@ const RoomSchema = new Schema<RoomData>(
 			default: '',
 		},
 
+		password: {
+			type: String,
+			required: false,
+			default: null,
+		},
+
 		// room states
 		roomStatus: {
 			type: String,
-			enum: ['ACTIVE', 'LOCKED', 'ARCHIVED'],
+			enum: Object.values(RoomStatus),
 			required: true,
-			default: 'ACTIVE',
-		},
-
-		isLocked: {
-			type: Boolean,
-			required: true,
-			default: false,
+			default: RoomStatus.ACTIVE,
 		},
 
 		banned: {

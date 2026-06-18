@@ -54,7 +54,6 @@ export default function AuthModal() {
 							email,
 							_id: userId,
 						} = data.user;
-						logger.debug({ data }, 'LOGIN');
 
 						setUser({
 							userId,

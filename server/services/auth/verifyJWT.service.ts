@@ -1,12 +1,14 @@
 import { NextFunction, Request, Response } from 'express';
-import TokenBlacklist from 'services/redis/TokenBlacklist';
-import logger from '@shared/util/logger';
 import { verifyAccessToken } from './verifyAccessToken.service';
+import { MissingSecretError } from './auth.errors';
+import { handleAuthError } from './handleAuthErrors';
+import logger from '@shared/util/logger';
 
 const extractBearerToken = (authHeader: string | undefined): string | null => {
 	if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
 	return authHeader.split(' ')[1] ?? null;
 };
+const log = logger.child({ method: 'verifyJWT' });
 
 /**
  * Factory that returns a JWT verification middleware bound to a TokenBlacklist instance.
@@ -18,18 +20,20 @@ const extractBearerToken = (authHeader: string | undefined): string | null => {
  * - Expired token => flag for refresh
  * - Valid, non-blacklisted token => attach to req and continue
  */
-const createVerifyJWT = (tokenBlacklist: TokenBlacklist) => {
-	return async (req: Request, res: Response, next: NextFunction) => {
+const verifyJwt = async (req: Request, res: Response, next: NextFunction) => {
+	try {
+		// Refresh token is present and live now evaluate the access token.
 		const result = await verifyAccessToken(
 			extractBearerToken(req.headers.authorization),
-			tokenBlacklist,
 		);
+
+		logger.debug({ result }, 'verifyjwt');
 
 		switch (result.status) {
 			case 'invalid':
-				return res.status(401).json({ error: 'No refresh token provided' });
+				return res.status(401).json({ error: 'No access token provided' });
 			case 'refresh':
-				req.userId = result.userId as string;
+				req.userId = result?.userId as string;
 				req.tokenRefreshNeeded = true;
 				return next();
 			case 'valid':
@@ -38,7 +42,9 @@ const createVerifyJWT = (tokenBlacklist: TokenBlacklist) => {
 				req.tokenRefreshNeeded = false;
 				return next();
 		}
-	};
+	} catch (error) {
+		handleAuthError(error, res, log);
+	}
 };
 
-export default createVerifyJWT;
+export default verifyJwt;

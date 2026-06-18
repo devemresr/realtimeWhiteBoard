@@ -7,12 +7,15 @@ export const ROOM_ROUTES = {
 	CREATE: `${API_BASE_PATHS.ROOM}/create`,
 	JOIN: `${API_BASE_PATHS.ROOM}/join`,
 	LIST_ACTIVE: `${API_BASE_PATHS.ROOM}/active`,
-	ONBOARD: `${API_BASE_PATHS.ROOM}/onboard`,
+	ONBOARD: '/onboard',
+	USERS: `${API_BASE_PATHS.ROOM}/users`,
 	GET_MISSING_PACKET: '',
 } as const;
 
 export const AUTH_ROUTES = {
 	LOGIN: `${API_BASE_PATHS.AUTH}/login`,
 	REGISTER: `${API_BASE_PATHS.AUTH}/register`,
-	TEST: `${API_BASE_PATHS.AUTH}/test`,
+	LOGOUT: `${API_BASE_PATHS.AUTH}/logout`,
+	REFRESH: `${API_BASE_PATHS.AUTH}/refresh`,
+	UPDATE: `${API_BASE_PATHS.AUTH}/update`,
 } as const;

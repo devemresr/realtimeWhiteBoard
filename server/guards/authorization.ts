@@ -2,12 +2,17 @@ import {
 	CLIENT_EVENTS,
 	ClientEvent,
 } from '@shared/constants/socketIo.constant';
-import { Role } from 'controllers/constants/cacheKeys.constant';
+import { Role } from '@/types';
 
 const EVENT_ROLE_REQUIREMENTS: Record<ClientEvent, Role[]> = {
 	[CLIENT_EVENTS.JOIN_ROOM]: Object.values(Role),
 	[CLIENT_EVENTS.LEAVE_ROOM]: Object.values(Role),
-	[CLIENT_EVENTS.CANVAS_OPERATION]: [Role.ADMIN, Role.PARTICIPANT],
+	[CLIENT_EVENTS.CLEAR_CANVAS]: [Role.ADMIN, Role.PARTICIPANT, Role.SPECTATOR],
+	[CLIENT_EVENTS.CANVAS_OPERATION]: [
+		Role.ADMIN,
+		Role.PARTICIPANT,
+		Role.SPECTATOR,
+	],
 	[CLIENT_EVENTS.KICK_USER]: [Role.ADMIN],
 	[CLIENT_EVENTS.LOCK_ROOM]: [Role.ADMIN],
 	[CLIENT_EVENTS.LOCK_CANVAS_PAGE]: [Role.ADMIN],

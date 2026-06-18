@@ -1,6 +1,8 @@
+import * as bcrypt from 'bcryptjs';
 import { Request, Response } from 'express';
 import logger from '@shared/util/logger';
 import { RedisClients } from 'controllers/constants/cacheKeys.constant';
+import { JoinRoomRequest, Role } from '@/types';
 import { RedisFactory } from 'services/redis/RedisFactory';
 import {
 	CACHE_KEYS,
@@ -16,18 +18,11 @@ const log = logger.child({ method: 'joinRoom.controller' });
 export const joinRoom = async (req: Request, res: Response) => {
 	try {
 		const userId = requireUserId(req);
-
 		const {
 			roomId,
-			role: reqRole,
+			role: reqRole = Role.SPECTATOR,
 			password,
-			code,
-		} = req.body as {
-			roomId: string;
-			role?: 'participant' | 'spectator';
-			password?: string;
-			code?: string;
-		};
+		} = (req.body ?? {}) as JoinRoomRequest;
 
 		log.info({ roomId, requestedRole: reqRole }, 'joinRoom request received');
 
@@ -76,6 +71,7 @@ export const joinRoom = async (req: Request, res: Response) => {
 			res.status(400).json({ error: 'joinRoom rejected: a role is required' });
 			return;
 		}
+		logger.debug({ reqRole, roomRole });
 		const role = assertRole(roomRole ?? reqRole);
 
 		let roomStatus: string | undefined;
@@ -123,13 +119,26 @@ export const joinRoom = async (req: Request, res: Response) => {
 			.pipeline()
 			.hset(CACHE_KEYS.ROOM_ROLES(roomId), userId, role)
 			.zadd(CACHE_KEYS.ACTIVE_ROOMS, Date.now(), roomId)
-			.hlen(CACHE_KEYS.ROOM_ROLES(roomId))
+			.hgetall(CACHE_KEYS.ROOM_ROLES(roomId))
+			.hgetall(CACHE_KEYS.ROOM_CONNECTED_USERS(roomId))
 			.exec();
+
 		if (!results) throw new Error('Redis pipeline returned null');
 
-		const [err, memberCount] = results[2] as [Error | null, number];
+		for (const [err] of results) {
+			if (err) throw err;
+		}
 
-		if (err) throw err;
+		const [, , [, roomRoles], [, connectedUsers]] = results as [
+			[Error | null, number],
+			[Error | null, number],
+			[Error | null, Record<string, string> | null],
+			[Error | null, Record<string, string> | null],
+		];
+
+		const memberRoles = roomRoles ?? {};
+		const connectedUserIds = Object.keys(connectedUsers ?? {});
+		const memberCount = connectedUserIds.length;
 
 		const maxMembers = Number(roomMeta?.maxMembers ?? 0);
 
@@ -138,20 +147,64 @@ export const joinRoom = async (req: Request, res: Response) => {
 			return;
 		}
 
-		if (roomMeta?.password && password && roomMeta.password !== password) {
-			res.status(403).json({ error: 'Invalid room password' });
-			return;
+		logger.debug({ roomMeta }, 'joinRoom');
+		if (roomMeta?.password) {
+			if (!password) {
+				res.status(403).json({ error: 'Room requires a password' });
+				return;
+			}
+
+			const isMatch = await bcrypt.compare(
+				password,
+				roomMeta.password as string,
+			);
+
+			if (!isMatch) {
+				res.status(403).json({ error: 'Invalid room password' });
+				return;
+			}
 		}
 
-		if (roomMeta?.code && code && roomMeta.code !== code) {
-			res.status(403).json({ error: 'Invalid room code' });
-			return;
+		// fetch profile data for everyone currently connected to the room
+		let users: Array<
+			{ userId: string; role?: string } & Record<string, unknown>
+		> = [];
+
+		if (connectedUserIds.length > 0) {
+			const profilePipeline = redis.pipeline();
+			connectedUserIds.forEach((id) => {
+				profilePipeline.hgetall(CACHE_KEYS.USER_PROFILE(id));
+			});
+
+			const profileResults = await profilePipeline.exec();
+			if (!profileResults) throw new Error('Redis pipeline returned null');
+
+			users = connectedUserIds.map((id, idx) => {
+				const [profileErr, rawProfile] = profileResults[idx] as [
+					Error | null,
+					Record<string, string> | null,
+				];
+				if (profileErr) throw profileErr;
+
+				const profile = rawProfile ? parseRedisFields(rawProfile) : {};
+
+				return {
+					userId: id,
+					role: memberRoles[id],
+					...profile,
+				};
+			});
 		}
 
 		log.info('joinRoom successful, handing off to socket handler');
-		return res
-			.status(201)
-			.json({ roomId, role, status: roomStatus, success: true, memberCount });
+		return res.status(201).json({
+			roomId,
+			role,
+			status: roomStatus,
+			success: true,
+			memberCount,
+			users,
+		});
 	} catch (error) {
 		log.error({ err: error }, 'Unexpected error at joinRoom controller');
 		return res.status(500).json({

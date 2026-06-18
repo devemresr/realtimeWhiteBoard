@@ -14,7 +14,10 @@ import { ToolHandlersMap, ToolType } from 'src/types/tool.types';
 import CanvasSideBar from './canvasSideBar/canvasSideBar';
 import { CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
-import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
+import {
+	useGetOnboardingData,
+	useRoomUsers,
+} from '../hooks/api/endpoints/useFormPosts';
 import useMouseLog from '../hooks/debug/useMouseLog';
 import { useBroadcastOrchestrator } from 'src/hooks/networking/synchronization/useBroadcastOrchestrator';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
@@ -27,6 +30,10 @@ import { canvasBarItems, cursors } from './config';
 import { useEraserManager } from 'src/hooks/canvas/drawing/useEraserManager';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
 import CanvasText from './canvasText';
+import { useRoomStatusStore } from 'src/store/RoomStore';
+import { CanvasEvent, EventType, MessageCategory } from '@/types';
+import { useUserStore } from 'src/store/UserStore';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ChildComponentProps {
 	socket: Socket | null;
@@ -47,33 +54,16 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	// TODO: Implement responsive canvas with coordinate transformation
 	// Replace offsetX/offsetY with getCanvasCoordinates() helper that transforms
 	// pointer events from display space to internal canvas resolution (1920x1080)
-
 	const {
-		clearCanvas,
 		drawDotOnCanvas,
 		drawIncrementalPath,
 		getEnrichedInterpolatedPoints,
+		clearCanvas,
 		ctxRef,
 		updateContextProps,
 	} = useCanvasDrawing(canvasRef, {
 		brushColor,
 		brushSize,
-	});
-
-	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
-		useMouseLog();
-
-	const { drawBroadcastPath } = useBroadcastOrchestrator(drawIncrementalPath);
-
-	const packetTransmitter = usePacketTransmitter(socket);
-	const { handlePacketSending } = packetTransmitter;
-
-	const drawTool = useDrawTool({
-		brushColor,
-		brushSize,
-		drawDotOnCanvas,
-		drawIncrementalPath,
-		handlePacketSending,
 	});
 
 	const {
@@ -83,20 +73,70 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		redrawCanvasWithoutErasedStrokes,
 	} = useEraserManager({ drawIncrementalPath, clearCanvas });
 
+	const { handlePacketSending, sendPacket } = usePacketTransmitter(
+		redrawCanvasWithoutErasedStrokes,
+		eraseStroke,
+	);
+
+	const userId = useUserStore((s) => s.userId);
+	const roomId = useRoomStatusStore((s) => s.roomId);
+	const handleClearCanvas = useCallback(() => {
+		clearCanvas();
+
+		const clearEvent: CanvasEvent = {
+			authorId: userId,
+			canvasMessageId: `${Date.now()}-${uuidv4()}`,
+			roomId,
+			category: MessageCategory.EVENT,
+			type: EventType.CLEAR_CANVAS,
+		};
+
+		sendPacket(clearEvent);
+	}, [clearCanvas, sendPacket, userId, roomId]);
+	const { updateMousePosition, isLogging, setIsLogging, mousePos } =
+		useMouseLog();
+
+	const { drawBroadcastPath } = useBroadcastOrchestrator(drawIncrementalPath);
+
+	const drawTool = useDrawTool({
+		brushColor,
+		brushSize,
+		drawDotOnCanvas,
+		drawIncrementalPath,
+		handlePacketSending,
+	});
+
 	const { handleMessage } = useSocketSubscription(
-		socket,
 		drawBroadcastPath,
 		eraseStroke,
 		redrawCanvasWithoutErasedStrokes,
 	);
 
+	const { renderOnboardingData } = useOnboardingSync(handleMessage);
+
+	const getOnboardingData = useGetOnboardingData();
+	useEffect(() => {
+		if (!roomId) return;
+
+		const load = async () => {
+			const data = await getOnboardingData.mutateAsync(roomId);
+			if (!data) return;
+			logger.debug({});
+
+			renderOnboardingData(data);
+		};
+
+		load();
+	}, [roomId, useGetOnboardingData, renderOnboardingData]);
+
 	const eraserTool = useEraserTool({
 		eraserSize: brushSize,
 		getEnrichedInterpolatedPoints,
-		packetTransmitter,
 		eraseWithInterpolatedPath,
 		eraseAtPoint,
+		sendPacket,
 	});
+
 	const tools = useMemo<Partial<ToolHandlersMap>>(
 		() => ({
 			draw: drawTool,
@@ -104,8 +144,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		}),
 		[drawTool, eraserTool],
 	);
-
-	// const getOnboardingDataQuerry = useGetOnboardingData();
 
 	useEffect(() => {
 		if (!canvasRef.current) return;
@@ -158,17 +196,6 @@ export default function Canvas({ socket }: ChildComponentProps) {
 		};
 	}, [redrawCanvasWithoutErasedStrokes]);
 
-	// hook to get onboarding data
-	// const { loadOnboardingData, isLoading, isError } = useOnboardingSync(
-	// 	getOnboardingDataQuerry,
-	// 	handleMessage,
-	// );
-	// Handler for onboarding button
-	// useEffect(() => {
-	// 	loadOnboardingData().catch((error) => {
-	// 		logger.error('Failed to load onboarding data on mount', error);
-	// 	});
-	// }, []);
 	const canUseCanvas = useCallback(() => {
 		const canvas = canvasRef.current;
 
@@ -220,6 +247,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
           }
         `}
 			</style>
+			{/* <button onClick={test}>test</button> */}
 			<CanvasText
 				textEditor={textEditor}
 				setTextEditor={setTextEditor}
@@ -231,7 +259,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 			<CanvasBar
 				setSelectedElement={setSelectedElement}
 				selectedElement={selectedElement}
-				clearCanvas={clearCanvas}
+				clearCanvas={handleClearCanvas}
 				isLogging={isLogging}
 				setIsLogging={setIsLogging}
 				canvasRef={canvasRef}

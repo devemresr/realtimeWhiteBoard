@@ -4,6 +4,10 @@ export type RoomStatusState = {
 	roomId: string;
 	role: string;
 	createdBy: string;
+	maxMemberCount?: number;
+	status: string;
+	name: string;
+	description: string;
 };
 
 export type RoomStatusActions = {
@@ -15,6 +19,10 @@ const initialState: RoomStatusState = {
 	roomId: '',
 	role: '',
 	createdBy: '',
+	maxMemberCount: 0,
+	description: '',
+	name: '',
+	status: '',
 };
 export const useRoomStatusStore = create<RoomStatusState & RoomStatusActions>(
 	(set) => ({

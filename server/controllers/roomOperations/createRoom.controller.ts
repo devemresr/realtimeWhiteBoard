@@ -1,3 +1,5 @@
+import pkg from 'bcryptjs';
+const { hashSync } = pkg;
 import { Request, Response } from 'express';
 import logger from '@shared/util/logger';
 import { requireUserId } from 'controllers/auth/auth.helpers';
@@ -6,13 +8,23 @@ import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 import {
 	CACHE_KEYS,
 	CACHE_KEYS_TTL,
-	Role,
 } from 'controllers/constants/cacheKeys.constant';
+import { Role } from '@/types';
 import RoomMetadata from 'models/RoomMetadata';
 import Room, { TimestampedRoom } from 'models/Room';
+import { SALT_ROUNDS } from 'controllers/auth/register.controller';
+import { RoomStatus } from '@/types';
 const { nanoid } = require('nanoid');
 
 let log = logger.child({ method: 'createRoom.controller' });
+type CreateRoomBody = {
+	name?: string;
+	description?: string;
+	maxMembers?: number | null;
+	isLocked?: boolean;
+	isPrivate?: boolean;
+	password?: string | null;
+};
 
 export const createRoom = async (req: Request, res: Response) => {
 	try {
@@ -25,16 +37,12 @@ export const createRoom = async (req: Request, res: Response) => {
 			description = '',
 			maxMembers = null,
 			isLocked = false,
-			code = null,
-			passwordHash = null,
-		} = req.body as {
-			name?: string;
-			description?: string;
-			maxMembers?: number | null;
-			isLocked?: boolean;
-			code?: string | null;
-			passwordHash?: string | null;
-		};
+			password = null,
+			isPrivate = false,
+		} = (req.body ?? {}) as CreateRoomBody;
+
+		const hashedPassword =
+			password && password.length > 0 ? hashSync(password, SALT_ROUNDS) : null;
 
 		const redis = RedisFactory.getInstance(RedisClients.MAIN).getRawClient();
 
@@ -105,10 +113,19 @@ export const createRoom = async (req: Request, res: Response) => {
 		);
 
 		// generate short human-readable room code
-		const roomId = nanoid(6);
+		const roomId = nanoid(6).toUpperCase();
 		log.child({ roomId });
 
 		// write to DB first source of truth
+		let roomStatus = RoomStatus.ACTIVE;
+
+		if (isPrivate) {
+			roomStatus = RoomStatus.PRIVATE;
+		}
+
+		if (isLocked) {
+			roomStatus = RoomStatus.LOCKED;
+		}
 		const room = await Room.create({
 			roomId,
 			createdBy: userId,
@@ -116,9 +133,8 @@ export const createRoom = async (req: Request, res: Response) => {
 			description,
 			maxMembers,
 			isLocked,
-			code,
-			passwordHash,
-			roomStatus: isLocked ? 'LOCKED' : 'ACTIVE',
+			password: hashedPassword,
+			roomStatus,
 		}).then((doc) => {
 			const { __v, createdAt, updatedAt, banned, ...room } =
 				doc.toObject() as TimestampedRoom & {

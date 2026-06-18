@@ -6,8 +6,9 @@ import {
 } from 'tests/utils/authTestHelpers';
 import { CLIENT_EVENTS } from '@shared/constants/socketIo.constant';
 import { RedisClients } from 'controllers/constants/cacheKeys.constant';
-import { CACHE_KEYS, Role } from 'controllers/constants/cacheKeys.constant';
-import { parseAccessToken } from '@shared/util/parseAccessToken';
+import { CACHE_KEYS } from 'controllers/constants/cacheKeys.constant';
+import { Role } from '@/types';
+import { parseAccessToken } from 'utils/token.helpers';
 import {
 	AuthHeaders,
 	createRoomAndGetId,
@@ -125,8 +126,6 @@ describe('socketGuard full event flow', () => {
 	});
 
 	it('allows admin to emit all admin-only events', async () => {
-		console.log('dih');
-
 		console.log(adminOnlyEvents.map((event, i) => `${i}: ${event}`));
 		const results = await Promise.all(
 			adminOnlyEvents.map((event, index) =>
@@ -201,7 +200,7 @@ describe('socketGuard full event flow', () => {
 		expect(res.success).toBe(false);
 	});
 
-	it('rejects admin emitting for a room they are not admin of', async () => {
+	it('rejects admin emitting an admin only event for a room they are not admin of', async () => {
 		// admin joins other room as participant only
 		const newRoomId = await createRoomAndGetId(getServer(), participantAuth);
 		await joinRoom(getServer(), adminAuth, newRoomId, 'participant');

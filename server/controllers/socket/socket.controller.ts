@@ -85,7 +85,7 @@ class SocketController {
 			if (!accessToken) {
 				return next(new Error('UNAUTHORIZED'));
 			}
-			const result = await verifyAccessToken(accessToken, this.tokenBlacklist);
+			const result = await verifyAccessToken(accessToken);
 
 			switch (result.status) {
 				case 'invalid':
@@ -125,8 +125,7 @@ class SocketController {
 		data: any,
 		callback?: Callback,
 	) {
-		const result = await verifyAccessToken(data.token, this.tokenBlacklist);
-		console.log('authentication result: ', result);
+		const result = await verifyAccessToken(data.token);
 		if (result.status === 'valid') {
 			await this.hydrateSocketData(socket, result.userId, result.jti);
 			callback?.({ success: true });
@@ -143,20 +142,12 @@ class SocketController {
 		socketLog.debug('connection event');
 
 		// socket.use(socketRateLimitMiddleware(socket, tokenBucket, () => {}));
-		this.registerStreamedEvents(socket, tokenBucket, socketLog);
-		this.registerRoomEvents(socket, userId, socketLog);
-	}
-
-	// Registers handlers for all STREAMED_EVENTS (canvas operations) with rate-limit token checks
-	private registerStreamedEvents(
-		socket: Socket,
-		tokenBucket: TokenBucket,
-		socketLog: Logger,
-	) {
-		STREAMED_EVENTS.forEach((event) => {
-			socket.on(
-				event,
-				socketGuard<CanvasMessage>(socket, event, async (data, callback) => {
+		socket.on(
+			CLIENT_EVENTS.CANVAS_OPERATION,
+			socketGuard<CanvasMessage>(
+				socket,
+				CLIENT_EVENTS.CANVAS_OPERATION,
+				async (data, callback) => {
 					const remainingTokens = await tokenBucket.getRemainingTokens();
 					socketLog.debug(
 						{ remainingTokens },
@@ -164,9 +155,11 @@ class SocketController {
 					);
 					this.handleRedisStreamWriteUp(data, callback);
 					this.handleCanvasOperation(socket, data, socketLog);
-				}),
-			);
-		});
+				},
+			),
+		);
+		this.registerRoomEvents(socket, userId, socketLog);
+		this.registerAdminEvents(socket, socketLog);
 	}
 
 	// Registers JOIN_ROOM and LEAVE_ROOM handlers for an authenticated socket
@@ -206,6 +199,8 @@ class SocketController {
 		if (!role) {
 			return new Error('Unexpected error please retry again.');
 		}
+
+		await socket.join(roomId);
 		await this.redis.hset(
 			CACHE_KEYS.ROOM_CONNECTED_USERS(roomId),
 			userId,
@@ -267,7 +262,10 @@ class SocketController {
 			}
 
 			const originalSocketId = socket.id;
-			log.info({ roomId }, 'Broadcasting drawing packet to room');
+			log.info(
+				{ roomId, originalSocketId, redisMessage },
+				'Broadcasting drawing packet to room',
+			);
 
 			this.io
 				.to(roomId)
@@ -281,6 +279,73 @@ class SocketController {
 				'Error broadcasting drawing packet to room',
 			);
 		}
+	}
+
+	// Registers all admin-only client events through socketGuard
+	// Guard already verifies the emitter is admin via ROOM_ROLES before handler runs
+	private registerAdminEvents(socket: Socket, socketLog: Logger) {
+		socket.on(
+			CLIENT_EVENTS.KICK_USER,
+			socketGuard(
+				socket,
+				CLIENT_EVENTS.KICK_USER,
+				async (data: any, callback) => {
+					await this.handleKickUser(socket, data, callback, socketLog);
+				},
+			),
+		);
+	}
+
+	// Full server-side kick:
+	// 1. Remove target from ROOM_ROLES so socketGuard rejects any future events from them
+	// 2. Look up their socketId from ROOM_CONNECTED_USERS and emit KICKED directly to them
+	// 3. Remove them from the Socket.IO room and clean up Redis
+	// 4. Broadcast ROOM_LEFT to remaining members so presence lists update
+	private async handleKickUser(
+		socket: Socket,
+		data: any,
+		callback: Callback | undefined,
+		socketLog: Logger,
+	) {
+		const { roomId, targetUserId } = data;
+		const log = socketLog.child({
+			method: 'handleKickUser',
+			roomId,
+			targetUserId,
+		});
+
+		if (!roomId || !targetUserId) {
+			return callback?.({
+				success: false,
+				error: 'roomId and targetUserId required',
+			});
+		}
+
+		const targetSocketId = await this.redis.hget(
+			CACHE_KEYS.ROOM_CONNECTED_USERS(roomId),
+			targetUserId,
+		);
+
+		// Remove from ROOM_ROLES first — socketGuard will reject any in-flight events from them
+		await this.redis.hdel(CACHE_KEYS.ROOM_ROLES(roomId), targetUserId);
+		await this.redis.hdel(
+			CACHE_KEYS.ROOM_CONNECTED_USERS(roomId),
+			targetUserId,
+		);
+
+		if (targetSocketId) {
+			const targetSocket = this.io.sockets.sockets.get(targetSocketId);
+			if (targetSocket) {
+				targetSocket.emit(SERVER_EVENTS.KICKED, { roomId });
+				targetSocket.leave(roomId);
+			}
+		}
+
+		// Notify remaining room members
+		this.io.to(roomId).emit(SERVER_EVENTS.ROOM_LEFT, { userId: targetUserId });
+
+		log.info('User kicked from room');
+		callback?.({ success: true });
 	}
 
 	// Handle individual socket disconnect

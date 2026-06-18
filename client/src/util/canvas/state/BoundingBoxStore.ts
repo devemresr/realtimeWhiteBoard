@@ -1,5 +1,4 @@
 import { BoundingBox, DrawingPoint } from '@/types';
-import logger from 'src/util/logger';
 import { SpatialGrid } from './SpatialGrid';
 
 /**
@@ -99,7 +98,7 @@ export class BoundingBoxStore {
 			maxY = Math.max(maxY, existing.maxY);
 		}
 
-		// Normalise to relative and store — single source of truth, no origin dims
+		// Normalise to relative and store - single source of truth, no origin dims
 		this.boxes.set(strokeId, {
 			minX: Math.max(0, minX) / this.canvasWidth,
 			minY: Math.max(0, minY) / this.canvasHeight,

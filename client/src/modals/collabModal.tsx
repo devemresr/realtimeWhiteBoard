@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { useModalStore } from 'src/store/ModalStore';
 import { collabButtons } from './config';
 import CreateRoom from 'src/components/createRoom';
 import JoinRoom from 'src/components/joinRoom';
 
 export default function CollabModal() {
 	const [CollabMode, setCollabMode] = useState<'create' | 'join' | null>(null);
-	const { closeModal } = useModalStore();
+	const [joinKey, setJoinKey] = useState(0);
 
 	return (
 		<div>
@@ -57,7 +56,16 @@ export default function CollabModal() {
     ${CollabMode ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}
   `}
 			>
-				{CollabMode === 'create' ? <CreateRoom /> : <JoinRoom />}
+				{CollabMode === 'create' ? (
+					<CreateRoom
+						onSwitchToJoin={() => {
+							setCollabMode('join');
+							setJoinKey((k) => k + 1); // forces JoinRoom to remount even if already on 'join'
+						}}
+					/>
+				) : (
+					<JoinRoom key={joinKey} />
+				)}
 			</div>
 		</div>
 	);

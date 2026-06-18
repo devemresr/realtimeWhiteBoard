@@ -14,6 +14,7 @@ export enum MessageStatus {
 	RECEIVED = 'RECEIVED', // Received from another user
 	FAILED = 'FAILED', // Failed, will retry
 	ABANDONED = 'ABANDONED', // Max retries reached, gave up sending
+	LOCAL = 'LOCAL',
 }
 
 export type CanvasMessage = CanvasOperation | CanvasEvent;

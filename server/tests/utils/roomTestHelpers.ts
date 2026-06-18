@@ -23,6 +23,8 @@ export const joinRoom = async (
 	roomId: string,
 	role: 'admin' | 'spectator' | 'participant' = 'spectator',
 ) => {
+	console.log('joinRoom helper role:', role);
+
 	return withAuth(request(server).post(ROOM_API.JOIN), auth).send({
 		roomId,
 		role,

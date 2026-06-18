@@ -85,17 +85,18 @@ class RedisStreamManager {
 		// todo add data validation and remove these checks
 		if (!roomId) throw new Error('roomId is required for dedup');
 		if (!authorId) throw new Error('authorId is required');
-
 		let redisMessageId: string | null;
 		try {
 			redisMessageId = (await this.redis.eval(
 				addToStreamAndDedup,
-				3,
+				4,
 				this.streamName!,
 				REDIS_KEYS.dedupKey(roomId),
 				REDIS_KEYS.msgAuthorKey(roomId),
+				REDIS_KEYS.strokeAuthorKey(roomId),
 				JSON.stringify(canvasMessageIds),
 				authorId,
+				data.strokeId ?? '',
 				...args,
 				...fieldValuePairs,
 			)) as string | null;

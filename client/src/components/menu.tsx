@@ -1,3 +1,4 @@
+'use client';
 import { useState } from 'react';
 import {
 	DownloadSVG,
@@ -14,11 +15,15 @@ import AuthModal from 'src/modals/authModal';
 import { useUserStore } from 'src/store/UserStore';
 import CollabModal from 'src/modals/collabModal';
 import { usePathname, useRouter } from 'next/navigation';
+import { useLogout } from 'src/hooks/api/endpoints/useFormPosts';
+import logger from 'src/util/loggerTest';
+import RoomStatusModal from 'src/modals/roomStatusManager';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);
 	const modalStore = useModalStore();
 	const { userId } = useUserStore();
 	const resetUser = useUserStore((state) => state.resetUser);
+	const logout = useLogout();
 	const router = useRouter();
 	const pathname = usePathname();
 	const loggedIn = !!userId;
@@ -30,8 +35,14 @@ export default function Menu() {
 					icon: <TbLogout color={color} size={28} />,
 					title: 'Log Out',
 					subtitle: '',
-					trigger: () => {
-						resetUser();
+					trigger: async () => {
+						try {
+							await logout.mutateAsync({});
+							localStorage.clear();
+							resetUser();
+						} catch (error) {
+							logger.error(error);
+						}
 					},
 				},
 				{
@@ -75,6 +86,20 @@ export default function Menu() {
 		},
 		...canvasMenuConfig,
 		...authenticatedMenuConfig,
+
+		{
+			key: 'room-status',
+			icon: <UsersSVG color={color} props={{ width: 28 }} />,
+			title: 'Room Status',
+			subtitle: '',
+			trigger: () =>
+				loggedIn
+					? modalStore.openModal({
+							title: 'Room Status',
+							extra: <RoomStatusModal />,
+						})
+					: modalStore.openModal({ extra: <AuthModal /> }),
+		},
 		{
 			key: 'live',
 			icon: <UsersSVG color={color} props={{ width: 28 }} />,
@@ -124,9 +149,14 @@ export default function Menu() {
 					className='container fixed left-2 top-12 bg-white border rounded-lg border-gray-200 p-2 shadow flex flex-col gap-1'
 				>
 					{menuElementsConfig.map((e) => {
-						const onClick = () => {
-							e.trigger?.();
-							setMenuOpen(false);
+						const onClick = async () => {
+							try {
+								await e.trigger?.();
+							} catch (error) {
+								console.error(error);
+							} finally {
+								setMenuOpen(false);
+							}
 						};
 						return (
 							<button

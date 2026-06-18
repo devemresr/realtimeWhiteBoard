@@ -1,17 +1,13 @@
 import { REDIS_KEYS } from 'controllers/constants/cacheKeys.constant';
 import Redis from 'ioredis';
 import { runRedisCommandAndParse } from 'utils/parseRedisFields';
-import { assertString } from 'utils/redis.assertions';
 
 export const getOperation = async (
 	redis: Redis,
-	messageId: string,
+	strokeId: string,
 	roomId: string,
 ) => {
-	return assertString(
-		await runRedisCommandAndParse(() =>
-			redis.hget(REDIS_KEYS.msgAuthorKey(roomId), messageId),
-		),
-		'auhtorId',
+	return await runRedisCommandAndParse(() =>
+		redis.hget(REDIS_KEYS.strokeAuthorKey(roomId), strokeId),
 	);
 };

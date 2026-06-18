@@ -1,6 +1,7 @@
 export const CLIENT_EVENTS = {
 	JOIN_ROOM: 'room:join',
 	LEAVE_ROOM: 'room:leave',
+	CLEAR_CANVAS: 'clear_canvas',
 	CANVAS_OPERATION: 'canvas:operation',
 	KICK_USER: 'kick:user',
 	LOCK_ROOM: 'lock:room',

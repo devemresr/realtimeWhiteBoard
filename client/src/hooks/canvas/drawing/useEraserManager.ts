@@ -1,6 +1,5 @@
 import { useCallback } from 'react';
 import { DrawingPoint, EraserPoint } from '@/types';
-// import logger from '../../../util/logger';
 import logger from 'src/util/loggerTest';
 import { DrawIncrementalPathFn } from './useCanvasDrawing';
 import { canvasState } from 'src/util/canvas/state/CanvasState';

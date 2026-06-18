@@ -25,7 +25,7 @@ import {
 	MessageCategory,
 	MessageStatus,
 } from '@/types';
-import { Role } from 'controllers/constants/cacheKeys.constant';
+import { Role } from '@/types';
 
 export function assertString(val: unknown, field: string): string {
 	if (typeof val !== 'string') throw new Error(`Expected string for ${field}`);

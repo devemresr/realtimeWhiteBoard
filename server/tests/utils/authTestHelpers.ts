@@ -6,6 +6,7 @@ export const TEST_USER = {
 	email: 'test@test.com',
 	password: 'Password123!',
 	name: 'name',
+	username: 'username',
 	surname: 'surname',
 };
 
@@ -15,6 +16,7 @@ export const createTestUser = (overrides?: Partial<typeof TEST_USER>) => {
 		email: `test_${suffix}@test.com`,
 		password: 'Password123!',
 		name: `name_${suffix}`,
+		username: `username_${suffix}`,
 		surname: `surname_${suffix}`,
 		...overrides,
 	};

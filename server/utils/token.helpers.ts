@@ -5,6 +5,9 @@ export interface TokenPayload {
 	email: string;
 	jti: string;
 }
+
+export type TokenType = 'refresh' | 'access';
+
 export const parseAccessToken = (token: string | null) => {
 	if (!token) throw new Error('expected a token');
 

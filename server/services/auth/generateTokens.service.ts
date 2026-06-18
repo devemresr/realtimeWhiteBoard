@@ -20,19 +20,21 @@ export const generateAccessToken = (userId: string, email: string) => {
 	return accessToken;
 };
 
+export const cookieOptions = {
+	httpOnly: true,
+	maxAge: 1000 * 60 * 60 * 24 * 30,
+	sameSite: 'lax' as const,
+	path: '/',
+	secure: process.env.NODE_ENV === 'production',
+};
+
 export const setRefreshTokenCookie = (
 	userId: string,
 	email: string,
 	res: Response,
 ) => {
 	const refreshToken = generateRefreshToken(userId, email);
-	res.cookie('jwt', refreshToken, {
-		httpOnly: true,
-		maxAge: 1000 * 60 * 60 * 30, // 30 days
-		sameSite: 'lax',
-		path: '/',
-		secure: process.env.NODE_ENV === 'development' ? false : true,
-	});
+	res.cookie('jwt', refreshToken, cookieOptions);
 };
 
 const generateRefreshToken = (userId: string, email: string) => {

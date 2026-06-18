@@ -7,6 +7,7 @@ import {
 import { canvasState } from 'src/util/canvas/state/CanvasState';
 import { DrawIncrementalPathFn } from '../../canvas/drawing/useCanvasDrawing';
 import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
+import { pointsToAbsolute } from 'src/util/canvas/state/CanvasState.helpers';
 
 export type DrawBroadcastPathFn = (packet: CanvasOperation) => void;
 
@@ -140,34 +141,42 @@ export class BroadcastRenderer {
 			receivedPacketIds: Array.from(situation.receivedPacketIds),
 		});
 
-		// Keep rendering while we have consecutive sequential packets
 		while (situation.receivedPacketIds.has(currentSeq)) {
 			const currentPacketId = `${packet.strokeId}-${currentSeq}`;
 			const currentPacket = canvasState.getPacket(
 				packet.strokeId,
 				currentPacketId,
 			);
-			const previousPacket = canvasState.getPreviousPacket(currentPacket);
-			const isFirstPacket = packet.packetSequenceNumber === 1;
+
+			if (!currentPacket) {
+				logger.error('Packet in receivedPacketIds but not in canvasState', {
+					strokeId: packet.strokeId,
+					currentSeq,
+					currentPacketId,
+				});
+				break;
+			}
+
+			const isFirstPacket = currentSeq === 1; // fix: use currentSeq, not outer packet
+			const previousPacket = isFirstPacket
+				? null
+				: canvasState.getPreviousPacket(currentPacket);
 
 			if (!previousPacket && !isFirstPacket) {
 				logger.error('Expected previous packet but none found', {
 					strokeId: packet.strokeId,
-					packetSequenceNumber: packet.packetSequenceNumber,
+					currentSeq,
 				});
-			} else {
-				// Always call via ref to avoid stale closure on drawIncrementalPath
-				this.drawIncrementalPathRef.current?.(previousPacket, currentPacket);
+				break; //  don't silently skip, stop draining
 			}
+
+			this.drawIncrementalPathRef.current?.(previousPacket, currentPacket);
 
 			situation.lastRenderedSequence = currentSeq;
 			currentSeq++;
 		}
 
-		// Update expected to the next missing one
 		situation.expectedPacketSequenceNumber = currentSeq;
-
-		// Update hold rendering based on remaining gaps
 		situation.holdRendering = situation.missingPacketIds.size > 0;
 
 		logger.debug('Drain complete', {
@@ -200,7 +209,22 @@ export class BroadcastRenderer {
 				isLastPacket,
 			});
 
-			canvasState.storePacket({ ...packet, status: MessageStatus.RECEIVED });
+			// Broadcast packets arrive in relative (0-1) coordinate space.
+			// storePacket's contract expects absolute pixel coordinates
+			// (it converts to relative internally for storage), so convert here.
+			const absolutePacket = {
+				...packet,
+				points: pointsToAbsolute(
+					packet.points,
+					canvasState.canvasWidth,
+					canvasState.canvasHeight,
+				),
+			};
+
+			canvasState.storePacket({
+				...absolutePacket,
+				status: MessageStatus.RECEIVED,
+			});
 
 			// Update packet tracking - creates situation if this is the first
 			// packet for this stroke, otherwise updates the existing one

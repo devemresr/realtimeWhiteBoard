@@ -1,10 +1,10 @@
 import pkg from 'bcryptjs';
 const { hashSync } = pkg;
 import { Request, Response } from 'express';
-import { PublicUser, User } from 'models/User';
+import { PublicUser, TimeStampedUser, User } from 'models/User';
 import { cacheUser, issueAuthResponse, trackRetention } from './auth.helpers';
 import logger from '@shared/util/logger';
-const SALT_ROUNDS = 10;
+export const SALT_ROUNDS = 10;
 
 const log = logger.child({ method: 'registerController' });
 
@@ -31,7 +31,7 @@ const register = async (req: Request, res: Response) => {
 			surname,
 			avatarUrl: avatarUrl ?? null,
 		}).then((doc) => {
-			const { __v, password, ...user } = doc.toObject();
+			const { __v, password, createdAt, updatedAt, ...user } = doc.toObject();
 			return user as PublicUser;
 		});
 

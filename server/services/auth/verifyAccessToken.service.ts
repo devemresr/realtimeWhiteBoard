@@ -1,7 +1,6 @@
-import TokenBlacklist from 'services/redis/TokenBlacklist';
-import { MissingSecretError } from './refreshAccessToken.service';
+import { MissingSecretError } from './auth.errors';
 import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
-import { TokenPayload } from '@shared/util/parseAccessToken';
+import { TokenPayload } from 'utils/token.helpers';
 
 export type VerifyTokenResult =
 	| { status: 'valid'; userId: string; jti: string }
@@ -10,16 +9,13 @@ export type VerifyTokenResult =
 
 export const verifyAccessToken = async (
 	accessToken: string | null,
-	tokenBlacklist: TokenBlacklist,
 ): Promise<VerifyTokenResult> => {
-	if (!process.env.ACCESS_TOKEN_SECRET) {
-		throw new MissingSecretError(
-			'ACCESS_TOKEN_SECRET environment variable is not set',
-		);
+	if (!accessToken) {
+		return { status: 'refresh' };
 	}
 
-	if (!accessToken) {
-		return { status: 'invalid' };
+	if (!process.env.ACCESS_TOKEN_SECRET) {
+		throw new MissingSecretError('ACCESS_TOKEN_SECRET');
 	}
 
 	try {
@@ -27,9 +23,6 @@ export const verifyAccessToken = async (
 			accessToken,
 			process.env.ACCESS_TOKEN_SECRET,
 		) as TokenPayload;
-
-		const isRevoked = await tokenBlacklist.isTokenRevoked(decoded.jti);
-		if (isRevoked) return { status: 'refresh', userId: decoded.userId };
 
 		return { status: 'valid', userId: decoded.userId, jti: decoded.jti };
 	} catch (error) {

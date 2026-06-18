@@ -75,6 +75,11 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 
 			const memberCount = rawRoleCount ?? 0;
 			const activeUserCount = rawActiveUserCount ?? 0;
+			logger.debug({ rawMeta });
+			console.log(
+				'rawMeta password field:',
+				(rawMeta as any).password ?? 'MISSING',
+			);
 			const meta = rawMeta
 				? parseRedisFields(rawMeta, RedisParseMode.HASH)
 				: null;
@@ -82,7 +87,6 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 			if (!meta) {
 				log.warn({ roomId }, 'room meta missing from Redis for live room');
 			}
-
 			return {
 				roomId,
 				name: meta?.name,
@@ -90,7 +94,7 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 				createdBy: meta?.createdBy,
 				isLocked: meta?.isLocked ?? false,
 				roomStatus: meta?.roomStatus,
-
+				hasPassword: meta?.password ? true : false,
 				memberCount,
 				activeUserCount,
 				isLive: activeUserCount > 0,
@@ -99,6 +103,7 @@ export const getRooms = async (req: Request, res: Response): Promise<void> => {
 			};
 		});
 
+		logger.debug({ rooms, method: 'getrooms' });
 		log.debug({ roomCount: rooms.length }, 'getRooms successful');
 		res.status(200).json({ rooms });
 	} catch (error) {

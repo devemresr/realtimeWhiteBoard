@@ -119,7 +119,8 @@ export const useDrawTool = ({
 			strokePointsRef.current = remainingPoints;
 
 			// Send packages over network
-			handlePacketSending();
+			if (roomPacketBuilderRef.current instanceof LocalPacketBuilder === false)
+				handlePacketSending();
 
 			// Render packets locally
 			packets.forEach((packet: DrawingOperation) => {

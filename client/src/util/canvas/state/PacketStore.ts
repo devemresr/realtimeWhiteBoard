@@ -7,7 +7,6 @@ import {
 } from '@/types';
 import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
-import logger from 'src/util/loggerTest';
 
 /**
  * PacketStore
@@ -69,13 +68,12 @@ export class PacketStore {
 			this.allPackets.set(packet.strokeId, packetMap);
 		}
 
-		logger.debug(
-			{ packet },
-			'before storing into the allPacket inside packetStore: ',
-		);
 		packetMap.set(packet.canvasMessageId, packet);
 
 		// Register in the appropriate status index
+		if (packet.status === MessageStatus.LOCAL) {
+			return;
+		}
 		if (packet.status === MessageStatus.CREATED) {
 			this.addToPendingSend(packet.strokeId, packet.canvasMessageId);
 		} else if (packet.status === MessageStatus.FAILED) {
@@ -192,7 +190,11 @@ export class PacketStore {
 
 	/** Iterate over every (actionId, packetMap) pair in the store. */
 	getAllEntries() {
-		return this.allPackets.entries();
+		return Array.from(this.allPackets.entries());
+	}
+
+	getAllStrokeIds() {
+		return Array.from(this.allPackets.keys());
 	}
 
 	/** All action IDs currently in the store. */

@@ -2,7 +2,7 @@
 import { useMutation, UseMutationOptions } from '@tanstack/react-query';
 import { apiFetch, ApiError } from './api-client';
 
-type HttpMethod = 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+type HttpMethod = 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'GET';
 
 type MutationConfig<
 	TData = unknown,
@@ -11,6 +11,7 @@ type MutationConfig<
 > = {
 	method: HttpMethod;
 	url: string;
+	serverUrl?: string;
 	mutationOptions?: Omit<
 		UseMutationOptions<TData, TError, TVariables>,
 		'mutationFn'

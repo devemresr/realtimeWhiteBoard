@@ -1,30 +1,43 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Socket } from 'socket.io-client';
 import { CLIENT_EVENTS } from '../../../../../shared/constants/socketIo.constant';
-import logger from '../../../util/logger';
+import logger from 'src/util/loggerTest';
 import {
 	MessageStatus,
 	CanvasMessage,
 	MessageCategory,
 	CanvasEvent,
 	CanvasOperation,
+	EraseEvent,
 } from '@/types';
 import { useSocketEmit } from '../socket/useSocketEmit';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
+import { useSocketStore } from 'src/store/socketStore';
+import { usePacketErrorHandler } from 'src/hooks/canvas/drawing/usePacketErrorHandler';
 
 export type HandlePacketSendingFn = ReturnType<
 	typeof usePacketTransmitter
 >['handlePacketSending'];
 
-const usePacketTransmitter = (socket: Socket | null) => {
+export type SendPacketFn = (packet: CanvasMessage) => Promise<void>;
+
+const usePacketTransmitter = (
+	redrawCanvasWithoutErasedStrokes: () => void,
+	eraseStroke: (strokeId: string) => void,
+) => {
+	const socket = useSocketStore((state) => state.socket);
 	const { emit } = useSocketEmit(socket);
 
 	const toNetworkDrawingPacket = (packet: CanvasOperation) => {
 		const { status, lastAttemptTimestamp, timestamp, ...networkData } = packet;
 		return networkData;
 	};
+
+	const { wrapCallback, handleCallbackError } = usePacketErrorHandler({
+		redrawCanvasWithoutErasedStrokes,
+		eraseStroke,
+	});
 
 	const sendDrawingPacket = useCallback(
 		async (packet: CanvasOperation) => {
@@ -33,6 +46,7 @@ const usePacketTransmitter = (socket: Socket | null) => {
 				packet.canvasMessageId,
 				MessageStatus.SENDING,
 			);
+
 			try {
 				const result = await emit(
 					CLIENT_EVENTS.CANVAS_OPERATION,
@@ -46,13 +60,21 @@ const usePacketTransmitter = (socket: Socket | null) => {
 							),
 					},
 				);
-				logger.debug('result of the packet emit event: ', result);
 
 				if (result.success) {
 					canvasState.updatePacketStatus(
 						packet.strokeId,
 						packet.canvasMessageId,
 						MessageStatus.ACKNOWLEDGED,
+					);
+				} else if (result.error) {
+					// Server rejected via callback
+
+					wrapCallback(packet.strokeId)(result);
+					canvasState.updatePacketStatus(
+						packet.strokeId,
+						packet.canvasMessageId,
+						MessageStatus.FAILED,
 					);
 				}
 			} catch (e) {
@@ -61,35 +83,53 @@ const usePacketTransmitter = (socket: Socket | null) => {
 					packet.canvasMessageId,
 					MessageStatus.FAILED,
 				);
-				logger.error('DrawingOperation send failed', {
-					canvasMessageId: packet.canvasMessageId,
-					error: e instanceof Error ? e.message : e,
-				});
+				logger.error(
+					{
+						canvasMessageId: packet.canvasMessageId,
+						error: e instanceof Error ? e.message : e,
+					},
+					'DrawingOperation send failed',
+				);
 			}
 		},
-		[emit],
+		[emit, wrapCallback],
 	);
 
 	const sendEventPacket = useCallback(
 		async (packet: CanvasEvent) => {
 			try {
-				// todo switch to passing the actual roomId
-				const data = { ...packet, roomId: 'room2' };
-				await emit(CLIENT_EVENTS.CANVAS_OPERATION, data);
+				const result = await emit(CLIENT_EVENTS.CANVAS_OPERATION, packet);
+				logger.debug({ result }, 'EMIT EVENT RESULT');
+
+				if (!result.success && result.error) {
+					const strokeIds = (packet as EraseEvent).erasedStrokeIds ?? [];
+					// strokeIds.forEach((id) => canvasState.unmarkStrokeErased(id));
+					handleCallbackError(result.error);
+				}
 			} catch (e) {
-				logger.error('CanvasEvent send failed', {
-					canvasMessageId: packet.canvasMessageId,
-					error: e instanceof Error ? e.message : e,
-				});
+				logger.error(
+					{
+						canvasMessageId: packet.canvasMessageId,
+						error: e instanceof Error ? e.message : e,
+					},
+					'CanvasEvent send failed',
+				);
 			}
 		},
-		[emit],
+		[emit, handleCallbackError],
 	);
 
 	const sendPacket = useCallback(
 		(packet: CanvasMessage) => {
-			if (!socket) {
-				logger.error('user isnt connected');
+			if (!socket?.connected) {
+				logger.error(
+					{
+						socketExists: !!socket,
+						socketConnected: socket?.connected,
+						category: packet.category,
+					},
+					'user isnt connected',
+				);
 				return;
 			}
 
@@ -100,15 +140,15 @@ const usePacketTransmitter = (socket: Socket | null) => {
 					return sendEventPacket(packet);
 			}
 		},
-		[sendDrawingPacket, sendEventPacket],
+		[socket, sendDrawingPacket, sendEventPacket],
 	);
 
 	const handlePacketSending = useCallback(() => {
 		const packetsToSend = canvasState.getAllPacketsToSend();
 		logger.debug(packetsToSend);
-		canvasState.getAllPacketsToSend().forEach(sendPacket);
+		packetsToSend.forEach(sendPacket);
 		return true;
-	}, [sendPacket]);
+	}, [sendPacket, socket]);
 
 	return {
 		handlePacketSending,

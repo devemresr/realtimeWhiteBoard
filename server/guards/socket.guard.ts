@@ -2,16 +2,18 @@ import {
 	CLIENT_EVENTS,
 	ClientEvent,
 } from '@shared/constants/socketIo.constant';
-import { RedisClients } from 'controllers/constants/cacheKeys.constant';
+import {
+	REDIS_KEYS,
+	RedisClients,
+} from 'controllers/constants/cacheKeys.constant';
 import { adminOnlyEvents, isEventAllowed } from './authorization';
 import { Socket } from 'socket.io';
 import logger from '@shared/util/logger';
-import { canManageRoom, canPerformOperation } from './permissions';
-import { getOperation } from './guard.helpers';
+import { canEraseOperation, canManageRoom } from './permissions';
 import { RedisFactory } from 'services/redis/RedisFactory';
-import { CACHE_KEYS, Role } from 'controllers/constants/cacheKeys.constant';
+import { CACHE_KEYS } from 'controllers/constants/cacheKeys.constant';
 import { assertRole } from 'utils/redis.assertions';
-import { CanvasOperationType, EventType } from '@/types';
+import { CanvasOperationType, EraseEvent, EventType } from '@/types';
 import {
 	ForbiddenError,
 	IdentityMismatchError,
@@ -20,6 +22,7 @@ import {
 	RoleChangedError,
 	SocketError,
 } from './socket.errors';
+import { Logger } from 'pino';
 
 type EventHandler<TPayload = unknown> = (
 	payload: TPayload,
@@ -38,7 +41,7 @@ type SocketPayloadCommon = {
 
 export type CanvasPayload = SocketPayloadCommon & { type: CanvasOperationType };
 export type RoomPayload = SocketPayloadCommon & { type: EventType };
-export type SocketPayloadBase = CanvasPayload | RoomPayload;
+export type SocketPayloadBase = CanvasPayload | RoomPayload | EraseEvent;
 
 const log = logger.child({ method: 'socketGuard' });
 export const socketGuard = <T extends SocketPayloadBase>(
@@ -47,7 +50,7 @@ export const socketGuard = <T extends SocketPayloadBase>(
 	handler: EventHandler<T>,
 ): EventHandler<T> => {
 	return async (payload: T, callback?: Callback): Promise<void> => {
-		let guardLog;
+		let guardLog: Logger;
 		try {
 			const redis = RedisFactory.getInstance(RedisClients.MAIN).getRawClient();
 			const {
@@ -79,23 +82,23 @@ export const socketGuard = <T extends SocketPayloadBase>(
 			} = payload;
 
 			// Fetch role directly from Redis don't trust the stale socket.data role
-			const actualRole = await redis.hget(
+			const cachedRole = await redis.hget(
 				CACHE_KEYS.ROOM_ROLES(socketRoomId),
 				socketUserId,
 			);
 			guardLog.debug(
 				{
-					actualRole,
+					cachedRole,
 				},
 				'fetched role from redis',
 			);
 
 			// null = user has no entry in this room's role hash => they're not a member (kicked, room deleted, etc.)
-			if (!actualRole) {
+			if (!cachedRole) {
 				guardLog.warn(
 					{
 						socketRole,
-						actualRole,
+						cachedRole,
 					},
 					'role changed since socket connection',
 				);
@@ -103,8 +106,8 @@ export const socketGuard = <T extends SocketPayloadBase>(
 			}
 
 			// Role changed since socket connected force reconnect to pick up new role
-			if (socket.data.inRoomRole !== actualRole) {
-				throw new RoleChangedError(socketRole, actualRole);
+			if (socket.data.inRoomRole !== cachedRole) {
+				throw new RoleChangedError(socketRole, cachedRole);
 			}
 
 			// Reject spoofed identity or room client payload must match the authenticated socket session
@@ -126,24 +129,23 @@ export const socketGuard = <T extends SocketPayloadBase>(
 				});
 			}
 
-			if (!isEventAllowed(eventName, assertRole(actualRole))) {
+			if (!isEventAllowed(eventName, assertRole(cachedRole))) {
 				guardLog.warn(
 					{
-						actualRole,
+						cachedRole,
 						eventName,
 					},
 					'event not allowed for role',
 				);
-				throw new ForbiddenError({ actualRole, eventName });
+				throw new ForbiddenError({ cachedRole, eventName });
 			}
 			// For canvas operations, verify the user is the author and in the right room
-			if (eventName === CLIENT_EVENTS.CANVAS_OPERATION)
-				guardLog.debug(
-					{
-						canvasMessageId: payloadCanvasMessageId,
-					},
-					'checking operation permissions',
-				);
+			guardLog.debug(
+				{
+					canvasMessageId: payloadCanvasMessageId,
+				},
+				'checking operation permissions',
+			);
 
 			if (
 				eventName === CLIENT_EVENTS.CANVAS_OPERATION &&
@@ -153,35 +155,58 @@ export const socketGuard = <T extends SocketPayloadBase>(
 					{ canvasMessageId: payloadCanvasMessageId },
 					'checking canvas operation permissions',
 				);
-				if (!payloadCanvasMessageId) {
-					throw new MissingPayloadError('canvasMessageId');
-				}
+				throw new MissingPayloadError('canvasMessageId');
 			}
 
-			// todo after adding any type of editing event change these parts
-			const authorId =
-				payload.type === EventType.ERASE
-					? await getOperation(redis, payloadCanvasMessageId, socketRoomId)
-					: null;
-			if (
-				authorId &&
-				!canPerformOperation(socketUserId, socketRoomId, authorId, socketRoomId)
-			) {
-				guardLog.warn(
-					{
-						canvasMessageId: payloadCanvasMessageId,
-					},
-					'operation permission denied',
-				);
-				throw new ForbiddenError({
-					reason: 'cannot_modify_others_operation',
-					canvasMessageId: payloadCanvasMessageId,
+			if (payload.type === EventType.ERASE) {
+				const erasedStrokeIds = (payload as EraseEvent).erasedStrokeIds;
+
+				const pipeline = redis.pipeline();
+
+				for (const strokeId of erasedStrokeIds) {
+					pipeline.hget(REDIS_KEYS.strokeAuthorKey(socketRoomId), strokeId);
+				}
+
+				const results = await pipeline.exec();
+
+				erasedStrokeIds.forEach((strokeId, i) => {
+					const [err, authorId] = results?.[i] ?? [];
+
+					if (err) {
+						throw err;
+					}
+
+					if (
+						authorId &&
+						!canEraseOperation(
+							socketUserId,
+							socketRoomId,
+							socketRole,
+							authorId as string,
+							payload.roomId,
+						)
+					) {
+						guardLog.warn(
+							{
+								strokeId,
+								authorId,
+								socketUserId,
+								socketRole,
+							},
+							'erase permission denied',
+						);
+
+						throw new ForbiddenError({
+							reason: 'cannot_erase_others_operation',
+							canvasMessageId: strokeId,
+						});
+					}
 				});
 			}
 
 			// For admin-only events, verify the user is actually admin of this specific room
 			if (
-				!adminOnlyEvents.includes(eventName) &&
+				adminOnlyEvents.includes(eventName) &&
 				!(await canManageRoom<T>(
 					redis,
 					eventName,
@@ -200,7 +225,7 @@ export const socketGuard = <T extends SocketPayloadBase>(
 			}
 		} catch (err) {
 			if (err instanceof SocketError) {
-				guardLog?.debug(
+				log?.debug(
 					{ name: err.name, context: err.context },
 					'expected socket error in guard',
 				);

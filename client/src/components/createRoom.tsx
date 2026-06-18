@@ -1,16 +1,35 @@
 import { useState } from 'react';
 import CustomInput from './customInput';
 import CustomTextArea from './customTextArea';
+import { useCreateRoom } from 'src/hooks/api/endpoints/useFormPosts';
+import { toast } from 'react-toastify';
+import logger from 'src/util/loggerTest';
+import { useRoomStatusStore } from 'src/store/RoomStore';
+import { RoomData } from '@/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { ROOM_ROUTES } from 'src/constants/routes.constant';
+type CreateRoomForm = Omit<
+	RoomData,
+	'createdBy' | 'banned' | 'roomId' | 'roomStatus'
+> & {
+	isPrivate: boolean;
+	password: string;
+};
+interface CreateRoomProps {
+	onSwitchToJoin: () => void;
+}
 
-export default function CreateRoom() {
-	const [roomForm, setRoomForm] = useState({
+export default function CreateRoom({ onSwitchToJoin }: CreateRoomProps) {
+	const [roomForm, setRoomForm] = useState<CreateRoomForm>({
 		name: '',
-		roomId: '',
 		description: '',
-		isLocked: false,
-		private: false,
+		isLocked: true,
+		isPrivate: false,
 		password: '',
 	});
+	const createRoom = useCreateRoom();
+	// const { closeModal } = useModalStore();
+	const setRoomStatus = useRoomStatusStore((state) => state.setRoom);
 
 	const handleRoomForm = (
 		e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -25,12 +44,43 @@ export default function CreateRoom() {
 					: value,
 		}));
 	};
+
+	const queryClient = useQueryClient();
+	const handleCreateRoom = async () => {
+		logger.debug({ roomForm }, 'handlecreateroom');
+		await createRoom.mutateAsync(
+			{
+				...roomForm,
+				isLocked: !roomForm.isLocked,
+				password: passwordActive ? roomForm.password : null,
+			},
+			{
+				onSuccess: (data) => {
+					logger.debug({ data });
+
+					queryClient.invalidateQueries({
+						queryKey: [ROOM_ROUTES.LIST_ACTIVE, null],
+					});
+
+					toast.success(
+						`Successfuly created room you can share: ${data.roomId}`,
+					);
+					onSwitchToJoin();
+				},
+
+				onError: (error) => {
+					logger.error(error);
+					toast.error('Could not create room');
+				},
+			},
+		);
+	};
 	const [passwordActive, setPasswordActive] = useState(false);
 	const roomDataConfig = [
-		{ name: 'private', title: 'Private', value: roomForm.private },
+		{ name: 'isPrivate', title: 'Private Room', value: roomForm.isPrivate },
 		{
 			name: 'isLocked',
-			title: 'Paticipant drawing locked',
+			title: 'Open for joining',
 			value: roomForm.isLocked,
 		},
 	];
@@ -53,11 +103,11 @@ export default function CreateRoom() {
 				props={{ maxLength: 125, rows: 3 }}
 			/>
 			{roomDataConfig.map((e) => (
-				<label className='inline-flex items-center'>
+				<label key={e.name} className='inline-flex items-center'>
 					<input
 						type='checkbox'
 						name={e.name}
-						value={e.value}
+						checked={Boolean(e.value)}
 						onChange={handleRoomForm}
 						className='sr-only peer'
 					/>
@@ -92,10 +142,19 @@ export default function CreateRoom() {
 					placeholder='123456'
 					onChange={(e) => handleRoomForm(e)}
 					value={roomForm.password}
-					className={`transition-all duration-[350ms] ease-in-out ${passwordActive ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'}`}
+					className={`overflow-hidden transition-all duration-[350ms] ease-in-out ${
+						passwordActive ? 'max-h-20 opacity-100' : 'max-h-0 opacity-0'
+					}`}
 				/>
 			</div>
-			<button className='bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out'>
+			<button
+				onClick={() => {
+					console.log('button clicked');
+					handleCreateRoom();
+				}}
+				className='bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition-colors duration-300 ease-in-out'
+				type='button'
+			>
 				Create Room
 			</button>
 		</div>

@@ -49,6 +49,12 @@ export const cacheUser = async (userInfo: Omit<PublicUser, 'password'>) => {
 	redis.hset(CACHE_KEYS.USER_PROFILE(userId), userInfo);
 	redis.expire(CACHE_KEYS.USER_PROFILE(userId), CACHE_KEYS_TTL.USER_PROFILE);
 };
+export const getCachedUser = async (userId: string) => {
+	const redis = RedisFactory.getInstance(RedisClients.MAIN).getRawClient();
+	const user = redis.hgetall(CACHE_KEYS.USER_PROFILE(userId));
+	redis.expire(CACHE_KEYS.USER_PROFILE(userId), CACHE_KEYS_TTL.USER_PROFILE);
+	return user;
+};
 
 export const requireUserId = (req: Request): string => {
 	if (!req.userId) {
@@ -61,4 +67,4 @@ export const requireUserId = (req: Request): string => {
 
 export const createProtectedRouteMiddleware = (
 	tokenBlacklist: TokenBlacklist,
-) => [createVerifyJWT(tokenBlacklist), refreshAccessToken];
+) => [createVerifyJWT, refreshAccessToken(tokenBlacklist)];

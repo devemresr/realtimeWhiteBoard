@@ -5,6 +5,7 @@ import { joinRoom } from 'controllers/roomOperations/joinRoom.controller';
 import { Router } from 'express';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
 import { getRooms } from 'controllers/roomOperations/getRooms';
+import { changeRoomSettings } from 'controllers/roomOperations/changeRoomStatus';
 
 const router = (tokenBlacklist: TokenBlacklist) => {
 	const router = Router();
@@ -23,6 +24,12 @@ const router = (tokenBlacklist: TokenBlacklist) => {
 		ROOM_ROUTES.LIST_ACTIVE,
 		...createProtectedRouteMiddleware(tokenBlacklist),
 		getRooms,
+	);
+
+	router.patch(
+		'/status',
+		...createProtectedRouteMiddleware(tokenBlacklist),
+		changeRoomSettings,
 	);
 
 	return router;

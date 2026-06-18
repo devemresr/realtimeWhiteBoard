@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { SERVER_EVENTS } from '../../../../../shared/constants/socketIo.constant';
-import logger from '../../../util/logger';
+import logger from 'src/util/loggerTest';
 import { DrawBroadcastPathFn } from '../synchronization/BroadcastRenderer';
 import {
 	CanvasMessage,
@@ -16,38 +16,42 @@ import {
 	EraseStrokeFn,
 	RedrawCanvasWithoutErasedStrokesFn,
 } from 'src/hooks/canvas/drawing/useEraserManager';
+import { useSocketStore } from 'src/store/socketStore';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 export type HandleMessageFn = (data: CanvasMessage) => void;
 
 const useSocketSubscription = (
-	socket,
 	drawBroadcastPath: DrawBroadcastPathFn,
 	eraseStroke: EraseStrokeFn,
 	redrawCanvasWithoutErasedStrokes: RedrawCanvasWithoutErasedStrokesFn,
 ) => {
 	const analytics = useRef(null);
+	const socket = useSocketStore((state) => state.socket);
+	useEffect(() => {
+		console.log(
+			'Socket changed in subscription:',
+			socket?.id,
+			socket?.connected,
+		);
+	}, [socket]);
+	useEffect(() => {
+		console.log('SOCKET subscription');
+	}, []);
+
 	// todo solve the localstorage max usage issue add cleanup for local storage and reactivate monitoring
 	// analytics.current = new DrawingAnalytics('user123', 6000);
 	// analytics.current.startRealtimeMonitoring(2000);
 
 	const handleCanvasPacket = useCallback(
 		(data: CanvasOperation) => {
-			logger.debug('Received broadcasted canvas packet:', data);
+			logger.debug({ data }, 'Received broadcasted canvas packet:');
 
 			switch (data.type) {
 				case CanvasOperationType.DRAWING:
 					drawBroadcastPath(data);
 					break;
-
-				case CanvasOperationType.ERASER:
-					// todo remove mock switch to a dedicated cursor
-					// const mockEraser = {
-					// 	...data,
-					// 	points: data.points.map((p) => ({ ...p, brushSize: 1 })),
-					// };
-					// drawBroadcastPath(mockEraser);
-					break;
 				default:
-					logger.warn('Received packet with unknown type:', data);
+					logger.warn({ data }, 'Received packet with unknown type:');
 			}
 		},
 		[drawBroadcastPath],
@@ -57,7 +61,7 @@ const useSocketSubscription = (
 		(data: CanvasEvent) => {
 			switch (data.type) {
 				case EventType.ERASE: {
-					logger.debug('Received erase event:', data);
+					logger.debug({ data }, 'Received erase event:');
 
 					data.erasedStrokeIds.forEach((strokeId) => {
 						eraseStroke(strokeId);
@@ -66,15 +70,26 @@ const useSocketSubscription = (
 					redrawCanvasWithoutErasedStrokes();
 					break;
 				}
+				case EventType.CLEAR_CANVAS: {
+					const strokeIds = canvasState.getAllStrokeIds();
 
+					strokeIds.forEach((strokeId) => {
+						canvasState.markStrokeErased(strokeId);
+						canvasState.removeStrokeFromGrid(strokeId);
+					});
+
+					redrawCanvasWithoutErasedStrokes();
+					break;
+				}
 				default:
-					logger.warn('Received packet with unknown type:', data);
+					logger.warn({ data }, 'Received packet with unknown type:');
 			}
 		},
 		[eraseStroke, redrawCanvasWithoutErasedStrokes],
 	);
 	const handleMessage: HandleMessageFn = useCallback(
 		(data) => {
+			logger.debug({ data }, 'HANDLE} MESSAGE REACHED');
 			switch (data?.category) {
 				case MessageCategory.DRAWING:
 					handleCanvasPacket(data);
@@ -83,7 +98,6 @@ const useSocketSubscription = (
 				case MessageCategory.EVENT:
 					handleEvent(data);
 					break;
-
 				default:
 					logger.warn('Received message with unknown category:', data);
 			}
@@ -91,9 +105,16 @@ const useSocketSubscription = (
 		[handleCanvasPacket, handleEvent],
 	);
 	useEffect(() => {
+		console.log(
+			'[subscription] socket:',
+			socket?.id,
+			'connected:',
+			socket?.connected,
+		);
 		if (!socket) return;
-		socket.on(`${SERVER_EVENTS.BROADCAST_OPERATION}`, handleMessage);
+		socket.on(SERVER_EVENTS.BROADCAST_OPERATION, handleMessage);
 		return () => {
+			console.log('[subscription] unregistering handler');
 			socket.off(SERVER_EVENTS.BROADCAST_OPERATION, handleMessage);
 		};
 	}, [socket, handleMessage]);

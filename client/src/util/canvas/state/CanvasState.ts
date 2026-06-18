@@ -140,7 +140,7 @@ class CanvasState {
 	storePacket(packet: CanvasOperation) {
 		logger.debug({ packet }, 'storing packet');
 
-		// bbox update always uses absolute points — must happen before conversion
+		// bbox update always uses absolute points - must happen before conversion
 		if (packet.type === CanvasOperationType.DRAWING) {
 			this.boundingBoxStore.update(
 				packet.strokeId,
@@ -244,6 +244,10 @@ class CanvasState {
 
 	getAllPackets() {
 		return this.packetStore.getAllEntries();
+	}
+
+	getAllStrokeIds() {
+		return this.packetStore.getAllStrokeIds();
 	}
 
 	getAllNonErasedDrawingPackets(): DrawingOperation[] {

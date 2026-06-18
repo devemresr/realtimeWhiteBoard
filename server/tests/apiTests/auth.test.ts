@@ -69,11 +69,11 @@ describe('POST /auth/login', () => {
 	});
 });
 
-describe('POST /auth/test - token verification + refresh flow', () => {
+describe('POST /auth/refresh - token verification + refresh flow', () => {
 	it('valid access token - request passes through', async () => {
 		const { accessToken, jwtCookie } = await registerAndGetTokens(getServer());
 		const res = await request(getServer())
-			.post('/auth/test')
+			.post(AUTH_API.REFRESH)
 			.set('Authorization', `Bearer ${accessToken}`)
 			.set('Cookie', jwtCookie);
 
@@ -87,7 +87,7 @@ describe('POST /auth/test - token verification + refresh flow', () => {
 		await wait(600);
 
 		const res = await request(getServer())
-			.post('/auth/test')
+			.post(AUTH_API.REFRESH)
 			.set('Authorization', `Bearer ${accessToken}`)
 			.set('Cookie', jwtCookie); // refresh token still valid (mocked to 2s)
 
@@ -96,7 +96,7 @@ describe('POST /auth/test - token verification + refresh flow', () => {
 
 		// protectedd handler forwards it (response header, body, etc.)
 		expect(res.body.accessToken).toBeDefined();
-		expect(res.body.accessToken !== accessToken).toBeDefined();
+		expect(res.body.accessToken).not.toBe(accessToken);
 	});
 
 	it('expired access + expired refresh - 401, must re-login', async () => {
@@ -106,7 +106,7 @@ describe('POST /auth/test - token verification + refresh flow', () => {
 		await wait(2500);
 
 		const res = await request(getServer())
-			.post('/auth/test')
+			.post(AUTH_API.REFRESH)
 			.set('Authorization', `Bearer ${accessToken}`)
 			.set('Cookie', jwtCookie);
 
@@ -121,7 +121,7 @@ describe('POST /auth/test - token verification + refresh flow', () => {
 
 		// No Cookie header at all - createVerifyJWT short-circuits immediately
 		const res = await request(getServer())
-			.post('/auth/test')
+			.post(AUTH_API.REFRESH)
 			.set('Authorization', `Bearer ${accessToken}`);
 		// deliberately no .set('Cookie', ...)
 
@@ -131,7 +131,7 @@ describe('POST /auth/test - token verification + refresh flow', () => {
 
 	it('no token at all - 401', async () => {
 		// No Authorization header, no Cookie
-		const res = await request(getServer()).post('/auth/test');
+		const res = await request(getServer()).post(AUTH_API.REFRESH);
 
 		expect(res.status).toBe(401);
 	});
@@ -140,17 +140,17 @@ describe('POST /auth/test - token verification + refresh flow', () => {
 		const { jwtCookie } = await registerAndGetTokens(getServer());
 
 		const res = await request(getServer())
-			.post('/auth/test')
+			.post(AUTH_API.REFRESH)
 			.set('Authorization', 'Bearer this.is.malformedToken')
 			.set('Cookie', jwtCookie);
 
-		expect(res.status).toBe(200);
-		expect(res.body.accessToken).toBeDefined();
+		expect(res.status).toBe(401);
+		expect(res.body.accessToken).toBeUndefined();
 	});
 
 	it('malformed access token with no refresh token - 401', async () => {
 		const res = await request(getServer())
-			.post('/auth/test')
+			.post(AUTH_API.REFRESH)
 			.set('Authorization', 'Bearer this.is.malformedToken');
 		// no cookie at all
 

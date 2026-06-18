@@ -1,10 +1,10 @@
 node_modules
-client/node_modules
-server/node_modules
-/.env
-/.env.local
-/.env.production
-/client/.env.production
+server/.env
+client/.env
+client/.env.production
+.env.production
+.env.local
+.env
 client/.next/
 client/out/
 server/wip/

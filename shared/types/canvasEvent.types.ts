@@ -2,6 +2,7 @@ import { MessageCategory, MessageStatus } from './message.types';
 
 export enum EventType {
 	ERASE = 'erase',
+	CLEAR_CANVAS = 'clear_canvas',
 	USER_JOIN = 'user_join',
 	USER_LEAVE = 'user_leave',
 	KICK_USER = 'kick_user',
@@ -22,6 +23,9 @@ interface BaseCanvasEvent {
 export type EraseEvent = BaseCanvasEvent & {
 	type: EventType.ERASE;
 	erasedStrokeIds: string[];
+};
+export type ClearCanvasEvent = BaseCanvasEvent & {
+	type: EventType.CLEAR_CANVAS;
 };
 
 export type UserJoinEvent = BaseCanvasEvent & {
@@ -61,5 +65,11 @@ export type RoomEvent =
 	| KickUserEvent
 	| LockRoomEvent
 	| LockCanvasPageEvent
-	| LockUserEvent;
-export type CanvasEvent = EraseEvent | UserJoinEvent | UserLeaveEvent;
+	| LockUserEvent
+	| CanvasEvent;
+
+export type CanvasEvent =
+	| EraseEvent
+	| UserJoinEvent
+	| UserLeaveEvent
+	| ClearCanvasEvent;

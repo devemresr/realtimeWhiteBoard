@@ -15,6 +15,7 @@ import {
 	enrichInterpolatedPoints,
 } from '../../../util/canvas/drawing/canvasDrawingUtils';
 import logger from 'src/util/loggerTest';
+import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 export type DrawIncrementalPathFn = <T extends CanvasOperation>(
 	previousPacket: T,
@@ -158,6 +159,7 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 	 */
 	const drawIncrementalPath: DrawIncrementalPathFn = useCallback(
 		(previousPacket, currentPacket) => {
+			logger.debug('DRAWINCRE');
 			if (currentPacket?.isLastPacket && currentPacket.points.length === 0) {
 				return {
 					interpolatedPoints: [],
@@ -213,10 +215,14 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 		[getEnrichedInterpolatedPoints, drawPoints],
 	);
 
-	// todo rewrite this
 	const clearCanvas = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
+		canvasState.getAllPackets().forEach(([strokeId, _]) => {
+			logger.debug({ strokeId });
+			canvasState.markStrokeErased(strokeId[0]);
+			canvasState.removeStrokeFromGrid(strokeId[0]);
+		});
 		const ctx = canvas.getContext('2d');
 		ctx?.clearRect(0, 0, canvas.width, canvas.height);
 	}, []);

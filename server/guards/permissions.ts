@@ -1,15 +1,19 @@
-import { CACHE_KEYS, Role } from 'controllers/constants/cacheKeys.constant';
+import { CACHE_KEYS } from 'controllers/constants/cacheKeys.constant';
+import { Role } from '@/types';
 import Redis from 'ioredis';
 
-export const canPerformOperation = (
+export const canEraseOperation = (
 	socketUserId: string,
 	socketRoomId: string,
-	authorId: string,
-	roomId: string,
+	socketRole: Role,
+	operationAuthorId: string,
+	operationRoomId: string,
 ): boolean => {
-	const isAuthor = authorId === socketUserId;
-	const isRequestFromTheConnectedRoom = roomId === socketRoomId;
-	return isAuthor && isRequestFromTheConnectedRoom;
+	const isSameRoom = socketRoomId === operationRoomId;
+	const isOwner = socketUserId === operationAuthorId;
+	const isAdmin = socketRole === Role.ADMIN;
+
+	return isSameRoom && (isOwner || isAdmin);
 };
 
 export const canManageRoom = async <

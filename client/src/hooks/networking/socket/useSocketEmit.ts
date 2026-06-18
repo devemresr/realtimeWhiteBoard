@@ -10,7 +10,7 @@ type EmitOptions = {
 
 type EmitResult = {
 	success: boolean;
-	error?: Error;
+	error?: string;
 };
 
 export function useSocketEmit(socket: Socket | null) {
@@ -29,7 +29,7 @@ export function useSocketEmit(socket: Socket | null) {
 			if (!socket?.connected) {
 				return {
 					success: false,
-					error: new Error('Socket not connected'),
+					error: 'Socket not connected',
 				};
 			}
 
@@ -40,16 +40,18 @@ export function useSocketEmit(socket: Socket | null) {
 							reject(new Error('Socket emit timeout'));
 						}, timeout);
 
-						socket.emit(eventName, data, (ack: boolean) => {
-							console.log('ack: ', ack);
-
-							clearTimeout(timer);
-							if (ack) {
-								resolve();
-							} else {
-								reject(new Error('Acknowledgement failed'));
-							}
-						});
+						socket.emit(
+							eventName,
+							data,
+							(ack: { success: boolean; error?: string }) => {
+								clearTimeout(timer);
+								if (ack?.success) {
+									resolve();
+								} else {
+									reject(new Error(ack?.error ?? 'Acknowledgement failed'));
+								}
+							},
+						);
 						options.onSent?.();
 					});
 
@@ -58,7 +60,7 @@ export function useSocketEmit(socket: Socket | null) {
 					if (attempt === maxRetries) {
 						return {
 							success: false,
-							error: error as Error,
+							error: error as string, // was: error as Error
 						};
 					}
 					// Exponential backoff: 800ms, 1600ms
@@ -70,7 +72,7 @@ export function useSocketEmit(socket: Socket | null) {
 
 			return {
 				success: false,
-				error: new Error('Unexpected error'),
+				error: 'Unexpected error',
 			};
 		},
 		[socket],

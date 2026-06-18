@@ -2,7 +2,7 @@ export const CACHE_KEYS = {
 	// user scope
 	USER_PROFILE: (userId: string) => `user:${userId}:profile`,
 
-	// userId => socketId string: used for targeted server pushes (kick, ban, promote)
+	// userId => socketId string: used for targeted server pushes (kick, ban)
 	ROOM_CONNECTED_USERS: (roomId: string) => `room:${roomId}:connectedUsers`,
 
 	// integer string: count of active rooms created by this user
@@ -28,12 +28,6 @@ export const CACHE_KEYS = {
 export const ROOM_INACTIVE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
 export const ROOM_ARCHIVAL_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-export enum Role {
-	ADMIN = 'admin',
-	SPECTATOR = 'spectator',
-	PARTICIPANT = 'participant',
-}
-
 export const CACHE_KEYS_TTL = {
 	USER_PROFILE: 60 * 60 * 24, // 24 hour
 	USER_SOCKET: 60 * 60 * 24, // session / 1 day max
@@ -47,6 +41,7 @@ export enum RedisStream {
 export const REDIS_KEYS = {
 	dedupKey: (roomId: string) => `room:${roomId}:dedup`,
 	msgAuthorKey: (roomId: string) => `room:${roomId}:msg_authors`,
+	strokeAuthorKey: (roomId: string) => `room:${roomId}:stroke_author`,
 };
 
 export enum RedisClients {
