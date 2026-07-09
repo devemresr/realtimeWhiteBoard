@@ -8,11 +8,8 @@ import {
 	MessageCategory,
 } from '@/types';
 import { ToolInstance } from 'src/types/tool.types';
-import logger from '../../../util/logger';
-import usePacketTransmitter, {
-	HandlePacketSendingFn,
-	SendPacketFn,
-} from '../../networking/packets/usePacketTransmitter';
+import logger from 'src/util/logger';
+import { SendPacketFn } from '../../networking/packets/usePacketTransmitter';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
 import {
 	LocalPacketBuilder,
@@ -97,8 +94,11 @@ export const useEraserTool = ({
 			eraserPathCache.current = [pos];
 			roomPacketBuilderRef.current.createNewStrokeMetaData();
 			logger.debug(
+				{
+					eraserPacketStrokeId:
+						roomPacketBuilderRef.current.getCurrentStrokeId(),
+				},
 				'eraser packet strokeId: ',
-				roomPacketBuilderRef.current.getCurrentStrokeId(),
 			);
 			roomPacketBuilderRef.current.buildEraserPackets([pos]);
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
 import {
 	MissingRefreshTokenError,

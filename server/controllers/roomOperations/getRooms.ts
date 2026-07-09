@@ -6,7 +6,7 @@ import {
 	ROOM_ARCHIVAL_THRESHOLD_MS,
 } from 'controllers/constants/cacheKeys.constant';
 import { parseRedisFields, RedisParseMode } from 'utils/parseRedisFields';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 
 const log = logger.child({ method: 'getRooms' });
 

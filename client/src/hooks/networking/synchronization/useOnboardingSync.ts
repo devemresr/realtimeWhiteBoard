@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { HandleMessageFn } from '../socket/useSocketSubscription';
 import {
 	CanvasEvent,

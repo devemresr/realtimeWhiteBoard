@@ -21,7 +21,7 @@
 		"test:room": "npm run infra:test && jest --detectOpenHandles --verbose server/tests/apiTests/room.test.ts",
 		"test:all": "npm run test:auth; npm run test:socket; npm run test:room",
 		"infra:load:up": "docker compose -p finalproject-test -f docker-compose.test.infra.yml -f docker-compose.loadtest.yml up -d",
-		"infra:load:up:scaled": "docker compose -p finalproject-test -f docker-compose.test.infra.yml -f docker-compose.loadtest.yml up -d --scale realtime_whiteboard=3",
+		"infra:load:up:scaled": "docker compose -p finalproject-test -f docker-compose.test.infra.yml -f docker-compose.loadtest.yml up -d --scale realtime_whiteboard=10",
 		"test:load": "npm run infra:load:up && ts-node server/scripts/seedLoadTestUser.ts $NUM_ROOMS && npm run test:load:run",
 		"test:load:scaled": "npm run infra:load:up:scaled && ts-node server/scripts/seedLoadTestUser.ts $NUM_ROOMS && npm run test:load:run",
 		"test:load:run": "npx artillery run --output report.json client/tests/artillery/stressTest.yaml",

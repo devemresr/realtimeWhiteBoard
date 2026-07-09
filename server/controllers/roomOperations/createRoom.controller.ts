@@ -1,7 +1,7 @@
 import pkg from 'bcryptjs';
 const { hashSync } = pkg;
 import { Request, Response } from 'express';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import { requireUserId } from 'controllers/auth/auth.helpers';
 import { RedisFactory } from 'services/redis/RedisFactory';
 import { RedisClients } from 'controllers/constants/cacheKeys.constant';

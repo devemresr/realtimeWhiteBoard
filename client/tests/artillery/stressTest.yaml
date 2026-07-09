@@ -8,7 +8,7 @@ config:
     order: sequence # each VU gets next room, cycles when exhausted
     skipHeader: true
   socketio:
-    transports: ['websocket', 'polling']
+    transports: ['websocket']
     upgrade: false
   phases:
     - duration: 30
@@ -21,7 +21,7 @@ config:
       arrivalRate: 400
       name: 'High load' # 12000
     - duration: 60
-      arrivalRate: 1000
+      arrivalRate: 1000 # 60000
       name: 'Stress'
   engines:
     socketio:
@@ -36,8 +36,8 @@ before:
     - post:
         url: '/auth/login'
         json:
-          email: 'loadtest@test.com'
-          password: 'testpassword'
+          email: 'test@c.c'
+          password: 'test'
         capture:
           - json: '$.accessToken'
             as: 'authToken'
@@ -79,7 +79,8 @@ scenarios:
                 isLastPackage: false
                 roomId: '{{ roomId }}'
           - think: 0.1
-        count: 10
+        count: 100
       - emit:
-          channel: '__disconnect'
-          data: {}
+          channel: 'room:leave'
+          data:
+            roomId: '{{ roomId }}'

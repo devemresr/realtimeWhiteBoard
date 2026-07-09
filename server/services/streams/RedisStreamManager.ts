@@ -5,7 +5,7 @@ import {
 } from 'controllers/constants/cacheKeys.constant';
 import { CanvasOperation } from '@/types';
 import { addToStreamAndDedup } from 'scripts/addToStreamAndDedup';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 
 interface StreamOptions {
 	maxLen?: number;

@@ -2,7 +2,7 @@ import * as bcrypt from 'bcryptjs';
 import { Request, Response } from 'express';
 import { TimeStampedUser, User } from '../../models/User';
 import { cacheUser, issueAuthResponse, trackRetention } from './auth.helpers';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 
 const log = logger.child({ method: 'login' });
 

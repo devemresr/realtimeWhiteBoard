@@ -1,7 +1,7 @@
 // canvasCoords.ts
 
 import { BasePoint, CanvasPoint, DrawingPoint } from '@/types';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 
 export function toRelative(value: number, dimension: number): number {
 	return value / dimension;

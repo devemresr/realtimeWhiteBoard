@@ -7,6 +7,7 @@ import {
 } from '@/types';
 import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
+import logger from 'src/util/logger';
 
 /**
  * PacketStore
@@ -31,6 +32,7 @@ import { ErasureStore } from './ErasureStore';
 export class PacketStore {
 	/** All packets: actionId -> canvasMessageId -> CanvasOperation */
 	private allPackets = new Map<string, Map<string, CanvasOperation>>();
+	private typeIndex = new Map<CanvasOperationType, Set<string>>(); // type -> Set<actionId>
 
 	/**
 	 * Interpolated points for drawing strokes only.
@@ -66,6 +68,11 @@ export class PacketStore {
 		if (!packetMap) {
 			packetMap = new Map();
 			this.allPackets.set(packet.strokeId, packetMap);
+			// register type
+			if (!this.typeIndex.has(packet.type)) {
+				this.typeIndex.set(packet.type, new Set());
+			}
+			this.typeIndex.get(packet.type)!.add(packet.strokeId);
 		}
 
 		packetMap.set(packet.canvasMessageId, packet);
@@ -79,6 +86,10 @@ export class PacketStore {
 		} else if (packet.status === MessageStatus.FAILED) {
 			this.addToNeedsRetry(packet.strokeId, packet.canvasMessageId);
 		}
+	}
+
+	getActionIdsByType(type: CanvasOperationType) {
+		return this.typeIndex.get(type) ?? new Set();
 	}
 
 	/**
@@ -208,14 +219,16 @@ export class PacketStore {
 	 */
 	getAllNonErasedDrawingPackets(): DrawingOperation[] {
 		const result: DrawingOperation[] = [];
+		const drawingActionIds =
+			this.typeIndex.get(CanvasOperationType.DRAWING) ?? new Set();
 
-		for (const [actionId, actionMap] of this.allPackets.entries()) {
+		for (const actionId of drawingActionIds) {
 			if (this.erasureStore.isErased(actionId)) continue;
-
-			for (const packet of actionMap.values()) {
-				if (packet.type !== CanvasOperationType.DRAWING) continue;
-				result.push(packet);
-			}
+			const packetMap = this.allPackets.get(actionId);
+			if (packetMap)
+				result.push(
+					...(packetMap.values() as IterableIterator<DrawingOperation>),
+				);
 		}
 
 		return result;

@@ -8,7 +8,7 @@ import {
 } from 'controllers/constants/cacheKeys.constant';
 import { adminOnlyEvents, isEventAllowed } from './authorization';
 import { Socket } from 'socket.io';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import { canEraseOperation, canManageRoom } from './permissions';
 import { RedisFactory } from 'services/redis/RedisFactory';
 import { CACHE_KEYS } from 'controllers/constants/cacheKeys.constant';

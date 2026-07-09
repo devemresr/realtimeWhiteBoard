@@ -12,7 +12,7 @@ import { BoundingBoxStore } from './BoundingBoxStore';
 import { ErasureStore } from './ErasureStore';
 import { PacketStore } from './PacketStore';
 import { SpatialGrid } from './SpatialGrid';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import {
 	pointsToAbsolute,
 	pointsToRelative,
@@ -222,6 +222,10 @@ class CanvasState {
 		const packet = this.packetStore.getPacket(actionId, canvasMessageId);
 		if (!packet) return undefined;
 		return this.toAbsolutePacket(packet);
+	}
+
+	getActionIdsByType(type: CanvasOperationType) {
+		return this.packetStore.getActionIdsByType(type) ?? new Set();
 	}
 
 	getPreviousPacket(packet: CanvasOperation): CanvasOperation | undefined {

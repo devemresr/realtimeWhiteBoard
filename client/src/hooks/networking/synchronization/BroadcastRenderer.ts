@@ -1,5 +1,4 @@
 import { CanvasOperation, MessageStatus } from '@/types';
-import logger from '../../../util/logger';
 import {
 	ReceivedPacketManager,
 	PacketSituation,
@@ -8,6 +7,7 @@ import { canvasState } from 'src/util/canvas/state/CanvasState';
 import { DrawIncrementalPathFn } from '../../canvas/drawing/useCanvasDrawing';
 import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
 import { pointsToAbsolute } from 'src/util/canvas/state/CanvasState.helpers';
+import logger from 'src/util/logger';
 
 export type DrawBroadcastPathFn = (packet: CanvasOperation) => void;
 
@@ -53,10 +53,13 @@ export class BroadcastRenderer {
 				}
 
 				if (response.status === 404) {
-					logger.warn('CanvasOperation not found in backend', {
-						strokeId,
-						sequence,
-					});
+					logger.warn(
+						{
+							strokeId,
+							sequence,
+						},
+						'CanvasOperation not found in backend',
+					);
 					delay = attempt * 300;
 					await new Promise((resolve) => setTimeout(resolve, delay));
 					continue;
@@ -67,11 +70,11 @@ export class BroadcastRenderer {
 				});
 			} catch (error) {
 				if (attempt === maxRetries) {
-					logger.error('Failed to fetch packet after all retries', error);
+					logger.error({ error }, 'Failed to fetch packet after all retries');
 					return null;
 				}
 				delay = attempt * 300;
-				logger.warn(`Fetch error, retrying in ${delay}ms`, { error });
+				logger.warn({ error }, `Fetch error, retrying in ${delay}ms`);
 				await new Promise((resolve) => setTimeout(resolve, delay));
 			}
 		}
@@ -88,7 +91,7 @@ export class BroadcastRenderer {
 		const situation = this.packetManager.getSituation(strokeId);
 		if (!situation) return;
 
-		logger.info('Gap filled', { strokeId, sequence });
+		logger.info({ strokeId, sequence }, 'Gap filled');
 
 		situation.missingPacketIds.delete(sequence);
 
@@ -107,7 +110,7 @@ export class BroadcastRenderer {
 		sequence: number,
 	) => {
 		const strokeId = packet.strokeId;
-		logger.warn('Gap declared permanent', { strokeId, sequence });
+		logger.warn({ strokeId, sequence }, 'Gap declared permanent');
 
 		this.packetManager.markGapAsPermanent(strokeId, sequence);
 
@@ -119,10 +122,13 @@ export class BroadcastRenderer {
 		// For now, just log it
 		const situation = this.packetManager.getSituation(strokeId);
 		if (situation) {
-			logger.warn('Stroke has permanent gaps', {
-				strokeId,
-				permanentGaps: Array.from(situation.permanentGaps),
-			});
+			logger.warn(
+				{
+					strokeId,
+					permanentGaps: Array.from(situation.permanentGaps),
+				},
+				'Stroke has permanent gaps',
+			);
 		}
 	};
 
@@ -135,11 +141,14 @@ export class BroadcastRenderer {
 	): void {
 		let currentSeq = situation.lastRenderedSequence + 1;
 
-		logger.debug('Draining sequential packets', {
-			strokeId: packet.strokeId,
-			startingFrom: currentSeq,
-			receivedPacketIds: Array.from(situation.receivedPacketIds),
-		});
+		logger.debug(
+			{
+				strokeId: packet.strokeId,
+				startingFrom: currentSeq,
+				receivedPacketIds: Array.from(situation.receivedPacketIds),
+			},
+			'Draining sequential packets',
+		);
 
 		while (situation.receivedPacketIds.has(currentSeq)) {
 			const currentPacketId = `${packet.strokeId}-${currentSeq}`;
@@ -149,11 +158,14 @@ export class BroadcastRenderer {
 			);
 
 			if (!currentPacket) {
-				logger.error('Packet in receivedPacketIds but not in canvasState', {
-					strokeId: packet.strokeId,
-					currentSeq,
-					currentPacketId,
-				});
+				logger.error(
+					{
+						strokeId: packet.strokeId,
+						currentSeq,
+						currentPacketId,
+					},
+					'Packet in receivedPacketIds but not in canvasState',
+				);
 				break;
 			}
 
@@ -163,10 +175,13 @@ export class BroadcastRenderer {
 				: canvasState.getPreviousPacket(currentPacket);
 
 			if (!previousPacket && !isFirstPacket) {
-				logger.error('Expected previous packet but none found', {
-					strokeId: packet.strokeId,
-					currentSeq,
-				});
+				logger.error(
+					{
+						strokeId: packet.strokeId,
+						currentSeq,
+					},
+					'Expected previous packet but none found',
+				);
 				break; //  don't silently skip, stop draining
 			}
 
@@ -179,12 +194,15 @@ export class BroadcastRenderer {
 		situation.expectedPacketSequenceNumber = currentSeq;
 		situation.holdRendering = situation.missingPacketIds.size > 0;
 
-		logger.debug('Drain complete', {
-			strokeId: packet.strokeId,
-			lastRendered: situation.lastRenderedSequence,
-			nextExpected: situation.expectedPacketSequenceNumber,
-			stillHolding: situation.holdRendering,
-		});
+		logger.debug(
+			{
+				strokeId: packet.strokeId,
+				lastRendered: situation.lastRenderedSequence,
+				nextExpected: situation.expectedPacketSequenceNumber,
+				stillHolding: situation.holdRendering,
+			},
+			'Drain complete',
+		);
 	}
 
 	// Main entry point for broadcast packets. Handles out-of-order arrival,
@@ -200,14 +218,17 @@ export class BroadcastRenderer {
 			} = packet;
 
 			const isFirstPacket = packetSequenceNumber === 1;
-			logger.debug('Processing broadcast packet', {
-				strokeId,
-				canvasMessageId,
-				packetSequenceNumber,
-				points,
-				isFirstPacket,
-				isLastPacket,
-			});
+			logger.debug(
+				{
+					strokeId,
+					canvasMessageId,
+					packetSequenceNumber,
+					points,
+					isFirstPacket,
+					isLastPacket,
+				},
+				'Processing broadcast packet',
+			);
 
 			// Broadcast packets arrive in relative (0-1) coordinate space.
 			// storePacket's contract expects absolute pixel coordinates
@@ -266,10 +287,13 @@ export class BroadcastRenderer {
 			if (wasMissing) {
 				situation.missingPacketIds.delete(packetSequenceNumber);
 				this.onGapResolved?.(strokeId, packetSequenceNumber);
-				logger.info('Missing packet arrived late', {
-					strokeId,
-					packetSequenceNumber,
-				});
+				logger.info(
+					{
+						strokeId,
+						packetSequenceNumber,
+					},
+					'Missing packet arrived late',
+				);
 			}
 
 			const isExpectedPacket =
@@ -292,11 +316,15 @@ export class BroadcastRenderer {
 
 			this.packetManager.setSituation(strokeId, situation);
 		} catch (error) {
-			logger.error('Failed to process broadcast packet', error, {
-				strokeId: packet.strokeId,
-				canvasMessageId: packet.canvasMessageId,
-				packetSequenceNumber: packet.packetSequenceNumber,
-			});
+			logger.error(
+				{
+					error,
+					strokeId: packet.strokeId,
+					canvasMessageId: packet.canvasMessageId,
+					packetSequenceNumber: packet.packetSequenceNumber,
+				},
+				'Failed to process broadcast packet',
+			);
 		}
 	};
 

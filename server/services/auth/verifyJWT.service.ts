@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import { verifyAccessToken } from './verifyAccessToken.service';
 import { MissingSecretError } from './auth.errors';
 import { handleAuthError } from './handleAuthErrors';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 
 const extractBearerToken = (authHeader: string | undefined): string | null => {
 	if (!authHeader || !authHeader.startsWith('Bearer ')) return null;

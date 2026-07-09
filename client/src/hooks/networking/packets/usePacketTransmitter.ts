@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { CLIENT_EVENTS } from '../../../../../shared/constants/socketIo.constant';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import {
 	MessageStatus,
 	CanvasMessage,

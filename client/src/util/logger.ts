@@ -1,98 +1,100 @@
-interface LoggerOptions {
-	env?: string;
-	verbose?: boolean;
+import pino, {
+	type Logger,
+	type LoggerOptions,
+	type SerializedError,
+} from 'pino';
+
+const env =
+	typeof process !== 'undefined' ? process.env.NODE_ENV : 'development';
+
+const isDev = env === 'development';
+const isTest = env === 'test';
+
+function safeStringify(o: unknown): string {
+	return JSON.stringify(
+		o,
+		(key, value) => {
+			if (value instanceof Map) {
+				return Object.fromEntries(value);
+			}
+			if (value instanceof Set) {
+				return Array.from(value);
+			}
+			if (value instanceof Error) {
+				return { message: value.message, stack: value.stack };
+			}
+			return value;
+		},
+		2,
+	);
 }
 
-type LogLevel = 'LOG' | 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
+const loggerOptions: LoggerOptions = {
+	level:
+		(typeof process !== 'undefined' && process.env.LOG_LEVEL) ||
+		(isDev || isTest ? 'debug' : 'info'),
 
-class Logger {
-	private env: string;
-	private enabled: boolean;
-	private verbose: boolean;
+	base: {
+		app: 'canvas-app',
+		env,
+	},
 
-	constructor(options: LoggerOptions = {}) {
-		this.env = options.env || process.env.NODE_ENV || 'development';
-		this.enabled = this.env === 'development' || this.env === 'dev';
-		this.verbose = options.verbose !== undefined ? options.verbose : true;
-	}
+	timestamp: pino.stdTimeFunctions.isoTime,
 
-	// Get caller file and line number
-	private getCallerInfo(): string {
-		if (!this.verbose) return '';
+	formatters: {
+		level(label) {
+			return {
+				level: label.toUpperCase(),
+			};
+		},
+	},
 
-		const err = new Error();
-		const stack = err.stack?.split('\n');
+	serializers: {
+		err: pino.stdSerializers.err,
+		error: pino.stdSerializers.err,
+	},
 
-		if (!stack) return '';
+	redact: {
+		paths: [
+			'authorization',
+			'token',
+			'accessToken',
+			'refreshToken',
+			'password',
+			'headers.authorization',
+			'headers.cookie',
+			'user.password',
+		],
+		remove: true,
+	},
 
-		// Stack trace format: "at functionName (file:line:column)"
-		const callerLine = stack[4] || stack[3] || stack[2];
+	browser: {
+		asObject: true,
+		serialize: true,
 
-		// Extract function name
-		const functionMatch = callerLine.match(/at\s+(\S+)\s+\(/);
+		write: {
+			fatal(o) {
+				console.error('[FATAL]', JSON.stringify(o, null, 2));
+			},
+			error(o) {
+				console.error('[ERROR]', JSON.stringify(o, null, 2));
+			},
+			warn(o) {
+				console.warn('[WARN]', JSON.stringify(o, null, 2));
+			},
+			info(o) {
+				console.info('[INFO]', JSON.stringify(o, null, 2));
+			},
+			debug(o) {
+				console.debug(safeStringify(o));
+			},
+			trace(o) {
+				console.trace('[TRACE]', JSON.stringify(o, null, 2));
+			},
+		},
+	},
+};
 
-		const functionName = functionMatch
-			? functionMatch[1].substring(
-					functionMatch[1].indexOf('.') + 1,
-					functionMatch[1].length,
-				)
-			: 'anonymous';
-
-		const match =
-			callerLine.match(/\((.+):(\d+):(\d+)\)/) ||
-			callerLine.match(/at (.+):(\d+):(\d+)/);
-
-		if (match) {
-			const filePath = match[1];
-			const fileName = filePath.split('/').pop() || filePath;
-			const lineNumber = match[2];
-			return `[${fileName}:${lineNumber} ${functionName}]`;
-		}
-
-		return '';
-	}
-
-	// Format log message with caller info
-	private formatMessage(level: LogLevel, ...args: any[]): any[] {
-		const callerInfo = this.getCallerInfo();
-		const timestamp = new Date().toISOString();
-		const prefix = this.verbose
-			? `[${timestamp}] [${level}] ${callerInfo}`
-			: `[${level}]`;
-
-		return [prefix, ...args];
-	}
-
-	public log(...args: any[]): void {
-		if (!this.enabled) return;
-		console.log(...this.formatMessage('LOG', ...args));
-	}
-
-	public info(...args: any[]): void {
-		if (!this.enabled) return;
-		console.info(...this.formatMessage('INFO', ...args));
-	}
-
-	public warn(...args: any[]): void {
-		if (!this.enabled) return;
-		console.warn(...this.formatMessage('WARN', ...args));
-	}
-
-	public error(...args: any[]): void {
-		if (!this.enabled) return;
-		console.error(...this.formatMessage('ERROR', ...args));
-	}
-
-	public debug(...args: any[]): void {
-		if (!this.enabled) return;
-		// Use console.log instead of console.debug to avoid dealing browser filtering
-		console.log(...this.formatMessage('DEBUG', ...args));
-	}
-}
-
-// Singleton instance
-const logger = new Logger({ verbose: true });
+const logger: Logger = pino(loggerOptions);
 
 export default logger;
-export { Logger };
-export type { LoggerOptions };

@@ -1,4 +1,4 @@
-import logger from '../../../util/logger';
+import logger from 'src/util/logger';
 
 // Tracks the state of an in-progress stroke as packets arrive over the network.
 // Since packets can arrive out of order or not at all, we need to maintain
@@ -30,7 +30,7 @@ export class ReceivedPacketManager {
 		let situation = this.packetSituations.get(strokeId);
 
 		if (!situation) {
-			logger.info('Stroke started', { strokeId });
+			logger.info({ strokeId }, 'Stroke started');
 			situation = {
 				receivedPacketIds: new Set<number>(),
 				expectedPacketSequenceNumber: 1,
@@ -63,11 +63,14 @@ export class ReceivedPacketManager {
 		situation: PacketSituation,
 		packetSequenceNumber: number,
 	): void {
-		logger.debug('Out-of-order packet detected', {
-			expected: situation.expectedPacketSequenceNumber,
-			received: packetSequenceNumber,
-			highestPacketSequenceNumber: situation.highestPacketSequenceNumber,
-		});
+		logger.debug(
+			{
+				expected: situation.expectedPacketSequenceNumber,
+				received: packetSequenceNumber,
+				highestPacketSequenceNumber: situation.highestPacketSequenceNumber,
+			},
+			'Out-of-order packet detected',
+		);
 
 		for (
 			let i = situation.highestPacketSequenceNumber + 1;
@@ -79,9 +82,12 @@ export class ReceivedPacketManager {
 			}
 		}
 
-		logger.debug('Missing packets detected', {
-			missing: Array.from(situation.missingPacketIds),
-		});
+		logger.debug(
+			{
+				missing: Array.from(situation.missingPacketIds),
+			},
+			'Missing packets detected',
+		);
 	}
 
 	// Called when a gap has exceeded its recovery timeout and we've given up waiting.
@@ -94,7 +100,7 @@ export class ReceivedPacketManager {
 		situation.permanentGaps.add(sequence);
 		situation.missingPacketIds.delete(sequence);
 
-		logger.warn('Gap marked as permanent', { strokeId, sequence });
+		logger.warn({ strokeId, sequence }, 'Gap marked as permanent');
 	}
 
 	// A stroke is only complete when we've received every packet from 1 to N.
@@ -109,10 +115,13 @@ export class ReceivedPacketManager {
 			situation.receivedPacketIds.size === situation.lastPacketSequenceNumber;
 
 		if (isComplete) {
-			logger.debug('Stroke is completed', {
-				totalPacket: situation.lastPacketSequenceNumber,
-				receivedPackets: situation.receivedPacketIds.size,
-			});
+			logger.debug(
+				{
+					totalPacket: situation.lastPacketSequenceNumber,
+					receivedPackets: situation.receivedPacketIds.size,
+				},
+				'Stroke is completed',
+			);
 		}
 
 		return isComplete;
@@ -133,11 +142,11 @@ export class ReceivedPacketManager {
 		const situation = this.packetSituations.get(strokeId);
 
 		if (!situation) {
-			logger.warn('Cannot clear non-existent stroke', { strokeId });
+			logger.warn({ strokeId }, 'Cannot clear non-existent stroke');
 			return;
 		}
 
-		logger.info('Cleared stroke situation', { strokeId });
+		logger.info({ strokeId }, 'Cleared stroke situation');
 		this.packetSituations.delete(strokeId);
 	}
 }

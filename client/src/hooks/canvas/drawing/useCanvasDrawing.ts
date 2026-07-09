@@ -14,7 +14,7 @@ import {
 	getInterpolatedPoints,
 	enrichInterpolatedPoints,
 } from '../../../util/canvas/drawing/canvasDrawingUtils';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 export type DrawIncrementalPathFn = <T extends CanvasOperation>(
@@ -218,16 +218,23 @@ const useCanvasDrawing = (canvasRef, brushOptions: BrushOptions) => {
 	const clearCanvas = useCallback(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-		canvasState.getAllPackets().forEach(([strokeId, _]) => {
-			logger.debug({ strokeId });
-			canvasState.markStrokeErased(strokeId[0]);
-			canvasState.removeStrokeFromGrid(strokeId[0]);
-		});
 		const ctx = canvas.getContext('2d');
 		ctx?.clearRect(0, 0, canvas.width, canvas.height);
 	}, []);
 
+	const eraseAllStrokes = useCallback(() => {
+		clearCanvas();
+		const drawingActionIds = canvasState.getActionIdsByType(
+			CanvasOperationType.DRAWING,
+		);
+		drawingActionIds.forEach((strokeId) => {
+			canvasState.markStrokeErased(strokeId);
+			canvasState.removeStrokeFromGrid(strokeId);
+		});
+	}, [clearCanvas]);
+
 	return {
+		eraseAllStrokes,
 		clearCanvas,
 		drawDotOnCanvas,
 		drawPoints,

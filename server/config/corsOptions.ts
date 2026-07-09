@@ -1,4 +1,4 @@
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import allowedOrigins from './allowedOrigins';
 
 const corsOptions = {

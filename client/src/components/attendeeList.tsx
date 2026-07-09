@@ -7,7 +7,7 @@ import { PiUsersThree } from 'react-icons/pi';
 import { useUserStore } from 'src/store/UserStore';
 import { useSocketStore } from 'src/store/socketStore';
 import { useRoomUsersStore } from 'src/store/user/RoomUserStore';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { CLIENT_EVENTS } from '@shared/constants/socketIo.constant';
 import { toast } from 'react-toastify';
 

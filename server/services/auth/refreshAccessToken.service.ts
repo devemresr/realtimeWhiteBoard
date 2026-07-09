@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { generateAccessToken } from './generateTokens.service';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import { TokenPayload } from 'utils/token.helpers';
 import {
 	InvalidRefreshToken,

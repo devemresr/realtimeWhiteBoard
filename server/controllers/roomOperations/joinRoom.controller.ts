@@ -1,6 +1,6 @@
 import * as bcrypt from 'bcryptjs';
 import { Request, Response } from 'express';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import { RedisClients } from 'controllers/constants/cacheKeys.constant';
 import { JoinRoomRequest, Role } from '@/types';
 import { RedisFactory } from 'services/redis/RedisFactory';

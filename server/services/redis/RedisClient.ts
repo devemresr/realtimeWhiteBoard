@@ -1,5 +1,5 @@
 import Redis, { RedisOptions } from 'ioredis';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import { EventEmitter } from 'events';
 import { redisCmdDuration } from '../../metrics';
 

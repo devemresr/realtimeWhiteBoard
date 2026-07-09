@@ -14,17 +14,14 @@ import { ToolHandlersMap, ToolType } from 'src/types/tool.types';
 import CanvasSideBar from './canvasSideBar/canvasSideBar';
 import { CanvasShapeKeys } from './types';
 import CanvasBar from './canvasBar';
-import {
-	useGetOnboardingData,
-	useRoomUsers,
-} from '../hooks/api/endpoints/useFormPosts';
+import { useGetOnboardingData } from '../hooks/api/endpoints/useFormPosts';
 import useMouseLog from '../hooks/debug/useMouseLog';
 import { useBroadcastOrchestrator } from 'src/hooks/networking/synchronization/useBroadcastOrchestrator';
 import usePacketTransmitter from '../hooks/networking/packets/usePacketTransmitter';
 import { useOnboardingSync } from '../hooks/networking/synchronization/useOnboardingSync';
 import { useDrawTool } from '../hooks/canvas/drawing/useDrawTool';
 import { useEraserTool } from '../hooks/canvas/drawing/useEraserTool';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import AttendeeList from './attendeeList';
 import { canvasBarItems, cursors } from './config';
 import { useEraserManager } from 'src/hooks/canvas/drawing/useEraserManager';
@@ -51,16 +48,12 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	});
 	const [brushSize, setBrushSize] = useState(8);
 	const [brushColor, setBrushColor] = useState('#000000');
-	// TODO: Implement responsive canvas with coordinate transformation
-	// Replace offsetX/offsetY with getCanvasCoordinates() helper that transforms
-	// pointer events from display space to internal canvas resolution (1920x1080)
 	const {
 		drawDotOnCanvas,
 		drawIncrementalPath,
 		getEnrichedInterpolatedPoints,
 		clearCanvas,
-		ctxRef,
-		updateContextProps,
+		eraseAllStrokes,
 	} = useCanvasDrawing(canvasRef, {
 		brushColor,
 		brushSize,
@@ -81,7 +74,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 	const userId = useUserStore((s) => s.userId);
 	const roomId = useRoomStatusStore((s) => s.roomId);
 	const handleClearCanvas = useCallback(() => {
-		clearCanvas();
+		eraseAllStrokes();
 
 		const clearEvent: CanvasEvent = {
 			authorId: userId,
@@ -179,9 +172,7 @@ export default function Canvas({ socket }: ChildComponentProps) {
 
 				canvasState.updateDimensions(width, height);
 
-				logger.debug('clearing canvas');
 				redrawCanvasWithoutErasedStrokes();
-				logger.debug('redrawing');
 
 				isCanvasResizingRef.current = false;
 				isCanvasReadyRef.current = true;

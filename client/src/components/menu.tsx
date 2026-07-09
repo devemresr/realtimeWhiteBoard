@@ -16,7 +16,7 @@ import { useUserStore } from 'src/store/UserStore';
 import CollabModal from 'src/modals/collabModal';
 import { usePathname, useRouter } from 'next/navigation';
 import { useLogout } from 'src/hooks/api/endpoints/useFormPosts';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import RoomStatusModal from 'src/modals/roomStatusManager';
 export default function Menu() {
 	const [menuOpen, setMenuOpen] = useState(false);

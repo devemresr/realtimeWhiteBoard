@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 
 export type Callback = (response: {
 	success?: boolean;

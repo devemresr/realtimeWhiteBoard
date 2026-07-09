@@ -1,5 +1,5 @@
 import { BoundingBox, DrawingPoint, EraserPoint } from '@/types';
-import logger from '../../../util/logger';
+import logger from 'src/util/logger';
 import { canvasState } from 'src/util/canvas/state/CanvasState';
 
 /**
@@ -152,21 +152,13 @@ export class CollisionDetection {
 			eraserRadius,
 		);
 
-		logger.debug(
-			'eraserBBox: ',
-			eraserBBox,
-			'created with:',
-			eraserInterpolatedPoints,
-		);
+		logger.debug({ createdWith: eraserInterpolatedPoints, eraserBBox });
 
 		// 2. Quick bbox collision check
 		if (!this.bboxesCollide(eraserBBox, strokePacketBBox)) {
 			logger.debug(
+				{ eraserBBox, strokePacketBBox },
 				`Bbox check failed for ${strokeId}/${canvasMessageId}`,
-				'eraserBBox:',
-				eraserBBox,
-				'strokeBBox:',
-				strokePacketBBox,
 			);
 			return false;
 		}

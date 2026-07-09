@@ -11,7 +11,7 @@ import { HandlePacketSendingFn } from '../../networking/packets/usePacketTransmi
 import { canvasState } from 'src/util/canvas/state/CanvasState';
 import { useUserStore } from 'src/store/UserStore';
 import { useRoomStatusStore } from 'src/store/RoomStore';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 
 interface UseDrawToolProps {
 	brushColor: string;

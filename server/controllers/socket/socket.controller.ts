@@ -7,7 +7,7 @@ import { Socket } from 'socket.io';
 import { Server } from 'socket.io';
 import RedisStreamManager from 'services/streams/RedisStreamManager';
 import TokenBucketManager from 'services/rate-limit/TokenBucketManager';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import pino, { Logger } from 'pino';
 import { verifyAccessToken } from 'services/auth/verifyAccessToken.service';
 import TokenBlacklist from 'services/redis/TokenBlacklist';
@@ -172,9 +172,13 @@ class SocketController {
 			this.handleJoinRoom(socket, userId, data, callback, socketLog),
 		);
 
-		socket.on(CLIENT_EVENTS.LEAVE_ROOM, (reason) => {
-			socketLog.info({ reason }, 'Client disconnected');
-			this.handleDisconnect(userId, socket);
+		socket.on('disconnect', (roomId) => {
+			logger.debug('artilleryDisconnect event listened');
+			// socketLog.info({ reason }, 'Socket disconnected');
+
+			// socketLog.info({ reason }, 'Client disconnected');
+			// this.handleDisconnect(userId, socket);
+			this.handleDisconnect(roomId, socket);
 		});
 	}
 
@@ -349,17 +353,18 @@ class SocketController {
 	}
 
 	// Handle individual socket disconnect
-	private async handleDisconnect(userId: string, socket: Socket) {
-		const socketLog = this.log.child({ userId });
-		const usersBucket = this.tokenBucketManager.getOrCreateBucket(userId);
-		usersBucket.cleanup();
-		const roomId = socket.data?.roomId;
-		await this.redis.hdel(
-			CACHE_KEYS.ROOM_CONNECTED_USERS(roomId),
-			userId,
-			socket?.id,
-		);
-		socketLog.info('Cleaned up resources for socket');
+	private async handleDisconnect(roomId: string, socket: Socket) {
+		socket.leave(roomId);
+		// const socketLog = this.log.child({ userId });
+		// const usersBucket = this.tokenBucketManager.getOrCreateBucket(userId);
+		// usersBucket.cleanup();
+		// const roomId = socket.data?.roomId;
+		// await this.redis.hdel(
+		// 	CACHE_KEYS.ROOM_CONNECTED_USERS(roomId),
+		// 	userId,
+		// 	socket?.id,
+		// );
+		// socketLog.info('Cleaned up resources for socket');
 	}
 }
 

@@ -1,5 +1,5 @@
 import { BoundingBox, EraserPoint } from '@/types';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 
 /**
  * SpatialGrid

@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { SERVER_EVENTS } from '../../../../../shared/constants/socketIo.constant';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { DrawBroadcastPathFn } from '../synchronization/BroadcastRenderer';
 import {
 	CanvasMessage,

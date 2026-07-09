@@ -8,10 +8,11 @@ async function seed() {
 
 	try {
 		const res = await axios.post(`${BASE_URL}/auth/register`, {
-			email: 'test@',
+			email: 'test@c.c',
 			password: 'test',
 			name: 'test',
 			surname: 'test',
+			username: 'test',
 		});
 		console.log('res for register : ', res.data);
 	} catch (e: any) {
@@ -23,8 +24,8 @@ async function seed() {
 	let accessToken, jwtCookie;
 	try {
 		const loginRes = await axios.post(`${BASE_URL}/auth/login`, {
-			email: 'loadtest@test.com',
-			password: 'testpassword',
+			email: 'test@c.c',
+			password: 'test',
 		});
 		accessToken = loginRes.data.accessToken;
 		jwtCookie =

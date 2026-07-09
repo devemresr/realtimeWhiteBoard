@@ -3,7 +3,7 @@ import CustomInput from './customInput';
 import CustomTextArea from './customTextArea';
 import { useCreateRoom } from 'src/hooks/api/endpoints/useFormPosts';
 import { toast } from 'react-toastify';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { useRoomStatusStore } from 'src/store/RoomStore';
 import { RoomData } from '@/types';
 import { useQueryClient } from '@tanstack/react-query';

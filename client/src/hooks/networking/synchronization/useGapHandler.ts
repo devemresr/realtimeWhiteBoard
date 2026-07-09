@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import logger from '../../../util/logger';
+import logger from 'src/util/logger';
 import { CanvasOperation } from '@/types';
 import { HandleGapFilledFn, HandleGapPermanentFn } from './gapHandler.types';
 
@@ -65,7 +65,7 @@ export const useGapHandler = ({
 			clearTimeout(timers.apiCallTimer);
 			clearTimeout(timers.permanentTimer);
 			activeGapTimers.current.delete(gapKey);
-			logger.debug('Cleared gap timers', { gapKey });
+			logger.debug({ gapKey }, 'Cleared gap timers');
 		}
 	}, []);
 
@@ -76,16 +76,19 @@ export const useGapHandler = ({
 
 			// Already handling this gap - avoid double timers
 			if (activeGapTimers.current.has(gapKey)) {
-				logger.debug('Gap already being tracked', { strokeId, sequence });
+				logger.debug({ strokeId, sequence }, 'Gap already being tracked');
 				return;
 			}
 
-			logger.info('Starting gap timeout', {
-				strokeId,
-				sequence,
-				apiCallTimeout,
-				permanentTimeout,
-			});
+			logger.info(
+				{
+					strokeId,
+					sequence,
+					apiCallTimeout,
+					permanentTimeout,
+				},
+				'Starting gap timeout',
+			);
 
 			// Timer 1: Try to fetch the missing packet from the backend after 300ms.
 			// If found, gap is filled and the permanent timer becomes irrelevant.
@@ -107,7 +110,7 @@ export const useGapHandler = ({
 						// Will wait for permanent timeout
 					}
 				} catch (error) {
-					logger.error(`[${gapKey}] API fetch failed`, error);
+					logger.error({ error }, `[${gapKey}] API fetch failed`);
 					// Will wait for permanent timeout
 				}
 			}, apiCallTimeout);
@@ -157,10 +160,13 @@ export const useGapHandler = ({
 
 		keysToDelete.forEach((key) => activeGapTimers.current.delete(key));
 
-		logger.debug('Cleared all gap timers for stroke', {
-			strokeId,
-			count: keysToDelete.length,
-		});
+		logger.debug(
+			{
+				strokeId,
+				count: keysToDelete.length,
+			},
+			'Cleared all gap timers for stroke',
+		);
 	}, []);
 
 	return {

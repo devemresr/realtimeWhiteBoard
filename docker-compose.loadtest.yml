@@ -6,6 +6,10 @@ services:
       mongo_test_init:
         condition: service_completed_successfully
     build: .
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     expose:
       - "3001"
     environment:
@@ -29,6 +33,10 @@ services:
 
   nginx:
     image: nginx:alpine
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
     ports:
       - "3001:80"
     volumes:

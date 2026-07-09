@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { cacheUser, getCachedUser, requireUserId } from './auth.helpers';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 import { PublicUser, User } from 'models/User';
 import {
 	cookieOptions,

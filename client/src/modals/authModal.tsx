@@ -7,7 +7,7 @@ import { useUserStore } from 'src/store/UserStore';
 import { useModalStore } from 'src/store/ModalStore';
 import { useLogin, useRegister } from 'src/hooks/api/endpoints/useFormPosts';
 import { toast } from 'react-toastify';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 
 export default function AuthModal() {
 	const setUser = useUserStore((state) => state.setUser);

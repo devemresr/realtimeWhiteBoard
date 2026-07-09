@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { User } from '../../models/User';
-import logger from '@shared/util/logger';
+import logger from 'utils/logger';
 
 type UpdateUserRequest = Partial<{
 	name: string;

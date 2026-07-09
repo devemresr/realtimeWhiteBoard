@@ -4,7 +4,7 @@ import { lazy, use, useEffect } from 'react';
 import { useRefresh } from 'src/hooks/api/endpoints/useFormPosts';
 import { useUserStore } from 'src/store/UserStore';
 import { useSocket } from 'src/hooks/canvas/room/useSocket';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { useEnterRoom } from 'src/hooks/canvas/room/useEnterRoom';
 import { toast } from 'react-toastify';
 
@@ -54,7 +54,6 @@ const WhiteBoardApp = () => {
 
 			try {
 				await enterRoom(roomId);
-				toast.success('room join');
 			} catch (err: any) {
 				toast.error(err.message ?? 'Failed to join room');
 			}

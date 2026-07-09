@@ -6,7 +6,7 @@ import { useGetRooms } from 'src/hooks/api/endpoints/useFormPosts';
 import { useEnterRoom } from 'src/hooks/canvas/room/useEnterRoom';
 import { toast } from 'react-toastify';
 import { RoomStatus } from '@/types';
-import logger from 'src/util/loggerTest';
+import logger from 'src/util/logger';
 import { useOnboardingSync } from 'src/hooks/networking/synchronization/useOnboardingSync';
 
 export default function JoinRoom() {
